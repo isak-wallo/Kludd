@@ -1,4 +1,8 @@
-const CACHE = 'rita-v1';
+// Höj VERSION (v2 -> v3 osv.) varje gång du laddar upp nya filer,
+// så hämtas och cachas den nya versionen säkert.
+const VERSION = 'v2';
+const CACHE = 'rita-' + VERSION;
+
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +11,7 @@ const ASSETS = [
   './icon-512.png'
 ];
 
+// Installera: cacha allt och ta över direkt
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE)
@@ -15,14 +20,38 @@ self.addEventListener('install', function (e) {
   );
 });
 
+// Aktivera: radera gamla cache-versioner och ta kontroll över sidan
 self.addEventListener('activate', function (e) {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys()
+      .then(function (keys) {
+        return Promise.all(
+          keys.filter(function (k) { return k !== CACHE; })
+              .map(function (k) { return caches.delete(k); })
+        );
+      })
+      .then(function () { return self.clients.claim(); })
+  );
 });
 
+// Hämta: nätet först (så uppdateringar syns), cachen som reserv offline.
+// Endast egna GET-anrop hanteras och cachen hålls uppdaterad i bakgrunden.
 self.addEventListener('fetch', function (e) {
+  var req = e.request;
+  if (req.method !== 'GET') return;
+  if (new URL(req.url).origin !== self.location.origin) return;
+
   e.respondWith(
-    caches.match(e.request).then(function (r) {
-      return r || fetch(e.request);
-    })
+    fetch(req)
+      .then(function (res) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
+        return res;
+      })
+      .catch(function () {
+        return caches.match(req).then(function (r) {
+          return r || caches.match('./index.html');
+        });
+      })
   );
 });

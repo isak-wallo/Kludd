@@ -377,6 +377,14 @@
         if (btn) btn.disabled = (undoStack.length === 0);
     }
 
+    // Sant när appen körs som installerad app (redan helskärm) i stället
+    // för i en vanlig webbläsarflik.
+    function isInstalledApp() {
+        return window.matchMedia('(display-mode: fullscreen)').matches
+            || window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+    }
+
     // Starta appen och trigga helskärm via användarklick
     function startApp() {
         if (!document.fullscreenElement) {
@@ -388,8 +396,9 @@
         setTimeout(resizeCanvas, 100);
     }
 
-    // Bevakar om helskärm lämnas (t.ex. vid systemsvep)
+    // Bevakar om helskärm lämnas (endast relevant i webbläsarflik)
     document.addEventListener('fullscreenchange', () => {
+        if (isInstalledApp()) return; // Installerad app: ingen startskärm
         if (!document.fullscreenElement) {
             // Visar startskärmen på nytt för smidig återaktivering
             document.getElementById('start-overlay').style.display = 'flex';
@@ -410,6 +419,13 @@
     window.addEventListener('resize', resizeCanvas);
 
     resizeCanvas();
+
+    // Installerad app öppnas redan i helskärm – hoppa då direkt till ritytan.
+    if (isInstalledApp()) {
+        const overlay = document.getElementById('start-overlay');
+        if (overlay) overlay.style.display = 'none';
+        setTimeout(resizeCanvas, 50);
+    }
 
     // Registrera service worker (gör appen installerbar och offline-duglig)
     if ('serviceWorker' in navigator) {
