@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -17,17 +17,27 @@
         body {
             margin: 0;
             padding: 0;
-            width: 100vw;
-            height: 100vh;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
             user-select: none;
             -webkit-user-select: none;
             background-color: #000;
         }
+        /* #app hålls på en fast pixelstorlek av JS (layoutlås). När Androids
+           systemfält dyker upp och viewporten krymper behåller vi den stora
+           storleken så att layouten inte hoppar – fälten lägger sig då ovanpå
+           appens kant i stället för att trycka ihop den. */
+        #app {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;   /* reserv tills JS sätter px-storlek */
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
         @media (orientation: landscape) {
-            body {
+            #app {
                 flex-direction: row;
             }
         }
@@ -188,6 +198,7 @@
     <button id="start-btn" onclick="startApp()">STARTA</button>
 </div>
 
+<div id="app">
 <div id="canvas-container">
     <canvas id="viewCanvas"></canvas>
 </div>
@@ -201,6 +212,7 @@
     <div class="color-box c-lila"  style="background-color: #af52de;" onclick="selectColor('#af52de', this)"></div>
     <button id="undo-btn" class="sys-btn" onclick="undo()" disabled>ÅNGRA</button>
     <button id="clear-btn" class="sys-btn" onclick="handleClearClick()">RENSA</button>
+</div>
 </div>
 
 <script>
@@ -233,6 +245,36 @@
         render();
     }
 
+    // Layoutlås: håller appens yttermått på den största storlek vi sett i
+    // nuvarande orientering. När systemfälten på Android dyker upp krymper
+    // viewporten tillfälligt – då behåller vi den stora storleken så att
+    // ritytan och knapparna inte byter storlek (fälten lägger sig ovanpå
+    // kanten). Vid skärmrotation nollställs låset för den nya orienteringen.
+    let lockedW = 0, lockedH = 0;
+    let lockLandscape = null;
+
+    function applyLayout() {
+        const isLandscape = window.innerWidth > window.innerHeight;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        if (lockLandscape === null || isLandscape !== lockLandscape) {
+            lockLandscape = isLandscape;
+            lockedW = w;
+            lockedH = h;
+        } else {
+            if (w > lockedW) lockedW = w;
+            if (h > lockedH) lockedH = h;
+        }
+
+        const app = document.getElementById('app');
+        if (app) {
+            app.style.width = lockedW + 'px';
+            app.style.height = lockedH + 'px';
+        }
+        resizeCanvas();
+    }
+
     function render() {
         const W = viewCanvas.width;
         const H = viewCanvas.height;
@@ -251,18 +293,8 @@
         }
     }
 
-    function getPaperCoords(e) {
+    function getPaperCoordsXY(clientX, clientY) {
         const rect = viewCanvas.getBoundingClientRect();
-        let clientX, clientY;
-
-        if (e.touches && e.touches.length > 0) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
-
         const x = clientX - rect.left;
         const y = clientY - rect.top;
 
@@ -276,10 +308,10 @@
         }
     }
 
-    function startDrawing(e) {
+    // Ritar startpunkten (en prick) och påbörjar ett nytt streck.
+    function beginStrokeAt(coords) {
         isDrawing = true;
         pushUndo(); // Spara läget innan strecket så att ÅNGRA fungerar
-        const coords = getPaperCoords(e);
         lastX = coords.x;
         lastY = coords.y;
 
@@ -292,11 +324,9 @@
         resetClearButton();
     }
 
-    function draw(e) {
+    // Drar strecket vidare till nästa punkt.
+    function extendStrokeTo(coords) {
         if (!isDrawing) return;
-        if (e.cancelable) e.preventDefault();
-
-        const coords = getPaperCoords(e);
 
         pCtx.beginPath();
         pCtx.strokeStyle = currentColor;
@@ -313,8 +343,55 @@
         render();
     }
 
-    function stopDrawing() {
+    // --- Mus (för test i webbläsare på dator) ---
+    function onMouseDown(e) {
+        beginStrokeAt(getPaperCoordsXY(e.clientX, e.clientY));
+    }
+    function onMouseMove(e) {
+        if (isDrawing) extendStrokeTo(getPaperCoordsXY(e.clientX, e.clientY));
+    }
+    function onMouseUp() {
         isDrawing = false;
+    }
+
+    // --- Touch med stöd för flera fingrar samtidigt ---
+    // Bara ETT finger ritar i taget: det SENAST nedsatta fingret på ritytan.
+    // Därför kan en hand som håller paddan vila stilla mot skärmen (det fingret
+    // sattes ned först) medan andra handens finger – det som sattes ned sist –
+    // ritar. Vilande fingrar ignoreras helt.
+    let activeTouchId = null;
+
+    function findTouch(touchList, id) {
+        for (let i = 0; i < touchList.length; i++) {
+            if (touchList[i].identifier === id) return touchList[i];
+        }
+        return null;
+    }
+
+    function onTouchStart(e) {
+        if (e.cancelable) e.preventDefault();
+        // Senaste fingret i den här händelsen tar över som det ritande.
+        const t = e.changedTouches[e.changedTouches.length - 1];
+        activeTouchId = t.identifier;
+        beginStrokeAt(getPaperCoordsXY(t.clientX, t.clientY));
+    }
+
+    function onTouchMove(e) {
+        if (activeTouchId === null) return;
+        const t = findTouch(e.changedTouches, activeTouchId);
+        if (!t) return; // rörelse från ett vilande finger – ignoreras
+        if (e.cancelable) e.preventDefault();
+        extendStrokeTo(getPaperCoordsXY(t.clientX, t.clientY));
+    }
+
+    function onTouchEnd(e) {
+        if (activeTouchId === null) return;
+        // Avsluta strecket bara när det AKTIVA fingret lyfts. Lyfter ett
+        // vilande finger händer ingenting.
+        if (findTouch(e.changedTouches, activeTouchId)) {
+            activeTouchId = null;
+            isDrawing = false;
+        }
     }
 
     function selectColor(color, element) {
@@ -393,7 +470,7 @@
             });
         }
         document.getElementById('start-overlay').style.display = 'none';
-        setTimeout(resizeCanvas, 100);
+        setTimeout(applyLayout, 100);
     }
 
     // Bevakar om helskärm lämnas (endast relevant i webbläsarflik)
@@ -405,26 +482,31 @@
         } else {
             document.getElementById('start-overlay').style.display = 'none';
         }
-        setTimeout(resizeCanvas, 100);
+        setTimeout(applyLayout, 100);
     });
 
-    viewCanvas.addEventListener('mousedown', startDrawing);
-    viewCanvas.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', stopDrawing);
+    viewCanvas.addEventListener('mousedown', onMouseDown);
+    viewCanvas.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
 
-    viewCanvas.addEventListener('touchstart', startDrawing, { passive: false });
-    viewCanvas.addEventListener('touchmove', draw, { passive: false });
-    window.addEventListener('touchend', stopDrawing);
+    viewCanvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    viewCanvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
 
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', applyLayout);
+    window.addEventListener('orientationchange', applyLayout);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', applyLayout);
+    }
 
-    resizeCanvas();
+    applyLayout();
 
     // Installerad app öppnas redan i helskärm – hoppa då direkt till ritytan.
     if (isInstalledApp()) {
         const overlay = document.getElementById('start-overlay');
         if (overlay) overlay.style.display = 'none';
-        setTimeout(resizeCanvas, 50);
+        setTimeout(applyLayout, 50);
     }
 
     // Registrera service worker (gör appen installerbar och offline-duglig)
