@@ -19,22 +19,31 @@
         html, body {
             overscroll-behavior: none;
         }
+        /* Body fyller hela (fullskärms-)viewporten och CENTRERAR appen. När
+           systemfälten glider fram krymper viewporten och appen centreras om
+           – men eftersom appen redan är låst till den mindre storleken byter
+           den inte storlek, fälten fyller bara den svarta marginalen. */
         body {
             margin: 0;
             padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             user-select: none;
             -webkit-user-select: none;
             background-color: #000;
         }
-        /* #app hålls på en fast pixelstorlek av JS (layoutlås). När Androids
-           systemfält dyker upp och viewporten krymper behåller vi den stora
-           storleken så att layouten inte hoppar – fälten lägger sig då ovanpå
-           appens kant i stället för att trycka ihop den. */
+        /* #app låses av JS till den minsta viewporten (den när systemfälten är
+           framme) och fyller därför inte ut i fältens yta. */
         #app {
-            position: fixed;
-            top: 0;
-            left: 0;
+            position: relative;
+            flex: 0 0 auto;
             width: 100vw;   /* reserv tills JS sätter px-storlek */
             height: 100vh;
             overflow: hidden;
@@ -250,32 +259,44 @@
         render();
     }
 
-    // Layoutlås: håller appens yttermått på den största storlek vi sett i
-    // nuvarande orientering. När systemfälten på Android dyker upp krymper
-    // viewporten tillfälligt – då behåller vi den stora storleken så att
-    // ritytan och knapparna inte byter storlek (fälten lägger sig ovanpå
-    // kanten). Vid skärmrotation nollställs låset för den nya orienteringen.
-    let lockedW = 0, lockedH = 0;
+    // Mäter den MINSTA möjliga viewporten – den när systemfälten är framme.
+    // svw/svh ger det direkt på nyare webbvyer; på äldre faller det tillbaka
+    // till den aktuella storleken (då lär vi oss den lilla storleken första
+    // gången fälten visas i stället).
+    function measureSmallViewport() {
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;top:0;left:0;width:100svw;height:100svh;' +
+            'visibility:hidden;pointer-events:none;';
+        document.body.appendChild(probe);
+        const w = probe.offsetWidth || window.innerWidth;
+        const h = probe.offsetHeight || window.innerHeight;
+        document.body.removeChild(probe);
+        return { w: w, h: h };
+    }
+
+    // Layoutlås: appen sätts till den minsta yta vi sett i nuvarande
+    // orientering och centreras (via body). Systemfälten hålls dolda men deras
+    // yta är reserverad, så när de glider fram fyller de bara den svarta
+    // marginalen utan att appen byter storlek. Vid rotation nollställs låset.
+    let reservedW = Infinity, reservedH = Infinity;
     let lockLandscape = null;
 
     function applyLayout() {
         const isLandscape = window.innerWidth > window.innerHeight;
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-
         if (lockLandscape === null || isLandscape !== lockLandscape) {
             lockLandscape = isLandscape;
-            lockedW = w;
-            lockedH = h;
-        } else {
-            if (w > lockedW) lockedW = w;
-            if (h > lockedH) lockedH = h;
+            reservedW = Infinity;
+            reservedH = Infinity;
         }
+
+        const small = measureSmallViewport();
+        reservedW = Math.min(reservedW, window.innerWidth, small.w);
+        reservedH = Math.min(reservedH, window.innerHeight, small.h);
 
         const app = document.getElementById('app');
         if (app) {
-            app.style.width = lockedW + 'px';
-            app.style.height = lockedH + 'px';
+            app.style.width = reservedW + 'px';
+            app.style.height = reservedH + 'px';
         }
         resizeCanvas();
     }

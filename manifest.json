@@ -3,7 +3,7 @@
   "short_name": "Rita",
   "start_url": ".",
   "scope": ".",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#000000",
   "theme_color": "#000000",
