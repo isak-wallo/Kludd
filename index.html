@@ -515,7 +515,19 @@
     // Registrera service worker (gör appen installerbar och offline-duglig)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-            navigator.serviceWorker.register('sw.js').catch(function () {});
+            navigator.serviceWorker.register('sw.js').then(function (reg) {
+                // När en ny version installerats och en gammal redan styr sidan
+                // laddar vi om automatiskt så att senaste koden alltid visas.
+                reg.addEventListener('updatefound', function () {
+                    var nw = reg.installing;
+                    if (!nw) return;
+                    nw.addEventListener('statechange', function () {
+                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                            window.location.reload();
+                        }
+                    });
+                });
+            }).catch(function () {});
         });
     }
 </script>
