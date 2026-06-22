@@ -280,20 +280,6 @@
         resizeCanvas();
     }
 
-    // Om Androids systemfält (t.ex. statusfältet) dykt upp och tryckt ihop
-    // appen försöker vi gå tillbaka till helskärm. Måste ske i en användargest,
-    // därför anropas detta från touchstart. När appen redan fyller skärmen
-    // (viewporten är som störst) görs ingenting.
-    function maybeReFullscreen() {
-        if (!document.fullscreenEnabled) return;
-        if (document.fullscreenElement) return;
-        if (window.innerHeight >= lockedH && window.innerWidth >= lockedW) return;
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-            el.requestFullscreen().catch(function () {});
-        }
-    }
-
     function render() {
         const W = viewCanvas.width;
         const H = viewCanvas.height;
@@ -389,7 +375,6 @@
 
     function onTouchStart(e) {
         if (e.cancelable) e.preventDefault();
-        maybeReFullscreen();
         // Senaste fingret i den här händelsen tar över som det ritande.
         const t = e.changedTouches[e.changedTouches.length - 1];
         activeTouchId = t.identifier;
