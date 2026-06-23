@@ -505,12 +505,12 @@
 
     applyLayout();
 
-    // Installerad app öppnas redan i helskärm – hoppa då direkt till ritytan.
-    if (isInstalledApp()) {
-        const overlay = document.getElementById('start-overlay');
-        if (overlay) overlay.style.display = 'none';
-        setTimeout(applyLayout, 50);
-    }
+    // Även installerad app visar STARTA-knappen. Tryckningen låter oss anropa
+    // Fullscreen-API:t (requestFullscreen i startApp), vilket ger Androids
+    // "immersive sticky"-läge – samma som i Chrome, där systemfälten glider in
+    // OVANPÅ appen utan att ändra storlek. Enbart display:fullscreen ger i
+    // stället ett läge som krymper ytan (studsen).
+    setTimeout(applyLayout, 50);
 
     // Registrera service worker (gör appen installerbar och offline-duglig)
     if ('serviceWorker' in navigator) {
