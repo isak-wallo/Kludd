@@ -74,6 +74,7 @@ body {
     height: 80%;
     position: relative;
     background-color: #fff;
+    touch-action: none;
 }
 @media (orientation: landscape) {
     #canvas-container {
@@ -153,6 +154,10 @@ body {
     box-shadow: 0 0 14px rgba(255,255,255,0.6);
     z-index: 2;
 }
+/* Svart ruta: ljusare kant så den syns mot den mörka panelen */
+.color-box.c-svart:not(.selected) {
+    border-color: rgba(255,255,255,0.35);
+}
 
 /* Systemknappen (Rensa) */
 .sys-btn {
@@ -166,10 +171,13 @@ body {
     font-size: clamp(13px, 3.5vw, 26px);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+.sys-btn:active:not(:disabled) {
+    transform: scale(0.9);
 }
 @media (orientation: landscape) {
     .sys-btn {
@@ -180,4 +188,12 @@ body {
 #undo-btn { background-color: #3a3a3c; }
 #undo-btn:disabled { opacity: 0.4; cursor: default; }
 #clear-btn { background-color: #3a3a3c; }
-#clear-btn.confirm { background-color: #ff3b30; }
+#clear-btn.confirm {
+    background-color: #ff3b30;
+    animation: pulse-confirm 0.3s ease;
+}
+@keyframes pulse-confirm {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}

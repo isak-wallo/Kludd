@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     paper.width = 900;
     paper.height = 1200;
     const pCtx = paper.getContext('2d');
+    const canvasContainer = document.getElementById('canvas-container');
 
     pCtx.fillStyle = '#ffffff';
     pCtx.fillRect(0, 0, paper.width, paper.height);
@@ -17,14 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const lineWidth = 20;
     let clearState = 0;
     let clearTimer = null;
-    const MAX_UNDO = 15;   // Hur många steg bakåt man kan ångra
+    const MAX_UNDO = 10;   // Hur många steg bakåt man kan ångra
     let undoStack = [];
 
     function resizeCanvas() {
-        const container = document.getElementById('canvas-container');
-        if (!container) return;
-        viewCanvas.width = container.clientWidth;
-        viewCanvas.height = container.clientHeight;
+        if (!canvasContainer) return;
+        viewCanvas.width = canvasContainer.clientWidth;
+        viewCanvas.height = canvasContainer.clientHeight;
         render();
     }
 
@@ -66,9 +66,20 @@ document.addEventListener('DOMContentLoaded', () => {
             vCtx.save();
             vCtx.translate(0, H);
             vCtx.rotate(-Math.PI / 2);
-            vCtx.scale(H / 900, W / 1200);
+            vCtx.scale(H / paper.width, W / paper.height);
             vCtx.drawImage(paper, 0, 0);
             vCtx.restore();
+        }
+    }
+
+    let renderPending = false;
+    function scheduleRender() {
+        if (!renderPending) {
+            renderPending = true;
+            requestAnimationFrame(() => {
+                render();
+                renderPending = false;
+            });
         }
     }
 
@@ -81,9 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const H = viewCanvas.height;
 
         if (W < H) {
-            return { x: (x / W) * 900, y: (y / H) * 1200 };
+            return { x: (x / W) * paper.width, y: (y / H) * paper.height };
         } else {
-            return { x: ((H - y) / H) * 900, y: (x / W) * 1200 };
+            return { x: ((H - y) / H) * paper.width, y: (x / W) * paper.height };
         }
     }
 
@@ -99,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pCtx.arc(lastX, lastY, lineWidth / 2, 0, Math.PI * 2);
         pCtx.fill();
 
-        render();
+        scheduleRender();
         resetClearButton();
     }
 
@@ -119,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastX = coords.x;
         lastY = coords.y;
 
-        render();
+        scheduleRender();
     }
 
     // --- Mus (för test i webbläsare på dator) ---
@@ -275,6 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', applyLayout);
     window.addEventListener('orientationchange', applyLayout);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) resetClearButton();
+    });
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', applyLayout);
     }
@@ -284,18 +298,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Registrera service worker
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-            navigator.serviceWorker.register('sw.js').then(function (reg) {
-                reg.addEventListener('updatefound', function () {
-                    var nw = reg.installing;
-                    if (!nw) return;
-                    nw.addEventListener('statechange', function () {
-                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                            window.location.reload();
-                        }
-                    });
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            reg.addEventListener('updatefound', () => {
+                const nw = reg.installing;
+                if (!nw) return;
+                nw.addEventListener('statechange', () => {
+                    if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                        window.location.reload();
+                    }
                 });
-            }).catch(function () {});
-        });
+            });
+        }).catch(() => {});
     }
 });
