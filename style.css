@@ -158,6 +158,9 @@ body {
 .color-box.c-svart:not(.selected) {
     border-color: rgba(255,255,255,0.35);
 }
+.color-box:active {
+    transform: scale(0.9);
+}
 
 /* Systemknappen (Rensa) */
 .sys-btn {

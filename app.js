@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const paper = document.createElement('canvas');
     paper.width = 900;
     paper.height = 1200;
-    const pCtx = paper.getContext('2d');
+    const pCtx = paper.getContext('2d', { willReadFrequently: true });
     const canvasContainer = document.getElementById('canvas-container');
 
     pCtx.fillStyle = '#ffffff';
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastX = 0;
     let lastY = 0;
     let currentColor = '#000000';
-    const lineWidth = 20;
+    const lineWidth = 16;
     let clearState = 0;
     let clearTimer = null;
     const MAX_UNDO = 10;   // Hur många steg bakåt man kan ångra
@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const H = viewCanvas.height;
         if (W === 0 || H === 0) return;
         vCtx.clearRect(0, 0, W, H);
+        vCtx.imageSmoothingEnabled = false;
 
         if (W < H) {
             vCtx.drawImage(paper, 0, 0, W, H);
@@ -191,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clearState = 1;
             btn.textContent = 'SÄKER?';
             btn.classList.add('confirm');
-            clearTimer = setTimeout(resetClearButton, 2500);
+            clearTimer = setTimeout(resetClearButton, 5000);
         } else {
             pushUndo();
             pCtx.fillStyle = '#ffffff';
