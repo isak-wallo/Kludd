@@ -2,10 +2,14 @@
     box-sizing: border-box;
 }
 
-/* Safe-area för statusfält (standalone-läge) */
+/* Safe-area för systemfält: statusfältet (övre) och navigeringsfältet (nedre).
+   Reserverar deras yta så de inte täcker över ritytan/knapparna när de är
+   synliga (t.ex. i Androids skärmlåsningsläge). I immersive fullscreen är
+   inset 0 och ytan blir full. */
 @supports (padding-top: env(safe-area-inset-top)) {
     #app {
         padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
     }
 }
 
