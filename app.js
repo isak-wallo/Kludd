@@ -311,7 +311,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.hidden) resetClearButton();
     });
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', debouncedLayout);
+        let lastViewportHeight = window.visualViewport.height;
+        window.visualViewport.addEventListener('resize', () => {
+            const vp = window.visualViewport;
+            const heightDiff = Math.abs(vp.height - lastViewportHeight);
+            // Ignorera små höjdändringar (≈ statusfältshöjd 24-48px) som orsakas
+            // när statusfältet dras ner/upp i fullscreen-läge.
+            if (heightDiff < 60) {
+                lastViewportHeight = vp.height;
+                return;
+            }
+            lastViewportHeight = vp.height;
+            debouncedLayout();
+        });
     }
 
     applyLayout();
