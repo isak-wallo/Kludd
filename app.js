@@ -117,22 +117,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Strökhantering (uppskjuten prick) ---
+    // --- Strökhantering (uppskjuten prick + vilofinger-skydd) ---
     // Ritar INTE en prick direkt vid touchstart. Ett finger som bara vilar
     // (ner och upp utan att rör sig, t.ex. vilande hand) ska inte lämna något
-    // märke. Först när fingret faktiskt rör sig ritas ett streck – starten
-    // täcks av rund lineCap så den ser ut som en prick. En ren dutt (ett
-    // ensamt finger: ner + upp utan flytt) ger en prick först vid touchend.
+    // märke. Först när fingret rör sig mer än STROKE_COMMIT_THRESHOLD ritas
+    // ett streck – starten täcks av rund lineCap så den ser ut som en prick.
+    // En ren dutt (ett ensamt finger: ner + upp utan flytt) ger en prick vid
+    // touchend. Om man lägger ett andra finger (t.ex. för att rita med det)
+    // raderas det förra fingrets korta spår automatiskt – det var bara vilande.
     let activeTouchId = null;
-    let strokeMoved = false;         // har den aktiva touchen rört sig (ritat)?
-    let strokeUndoPushed = false;    // har undo sparats för aktuell strök?
-    let strokeHadOther = false;      // fanns ett annat finger nere under denna touch?
+    let strokeCommitted = false;      // har den aktiva touchen rört sig tillräckligt för att rita?
+    let strokeUndoPushed = false;     // har undo sparats för aktuell strök?
+    let strokeHadOther = false;       // fanns ett annat finger nere under denna touch?
+    let strokeExtent = 0;             // max avstånd^2 från start (skärm-px) för aktuell strök
     let strokeStartX = 0, strokeStartY = 0;          // start på papperet
-    let strokeStartClientX = 0, strokeStartClientY = 0; // start på skärmen (för jittertröskel)
+    let strokeStartClientX = 0, strokeStartClientY = 0; // start på skärmen
 
-    // Hur många skärm-px ett finger måste flyttas för att räknas som ritande
-    // (större än ren darrning). Tunbar vid behov.
-    const MOVE_THRESHOLD = 4;
+    // Hur många skärm-px ett finger måste flyttas för att börja rita (större
+    // än ren darrning/jitter från ett vilande finger). Tunbar vid behov.
+    const STROKE_COMMIT_THRESHOLD = 20;
+    // Om ett finger rört sig mindre än så här många skärm-px när ett nytt finger
+    // läggs till, räknas det som vilande och dess korta spår raderas.
+    const REST_CANCEL_PX = 80;
 
     function ensureStrokeUndo() {
         if (!strokeUndoPushed) {
@@ -141,46 +147,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Raderar den aktiva ströken (återställer duken till läget före den) genom
+    // att poppa det undo-state som sparades vid commit. Används när ett finger
+    // som trampat igång visar sig vara vilande (nytt finger tillkom).
+    function cancelActiveStroke() {
+        pendingPoints.length = 0;
+        if (strokeUndoPushed && undoStack.length > 0) {
+            const img = undoStack.pop();
+            pCtx.putImageData(img, 0, 0);
+            render();
+            updateUndoState();
+        }
+        strokeUndoPushed = false;
+    }
+
     // Påbörjar en ny strök vid coords. Ritar inget ännu. Om ett annat finger
-    // redan ritar/vilar spolas dess buffrade punkter först, så inget streck
-    // dras från det fingret till den nya startpunkten.
+    // redan var aktivt sparas dess streck – alternativt raderas om det bara
+    // rörde sig lite (vilade) – så inget streck/prick lämnas under vilofingret.
     function startStrokeAt(coords, hadOther, clientX, clientY) {
-        flushPendingStrokes();
+        if (hadOther) {
+            if (strokeCommitted && strokeExtent < REST_CANCEL_PX * REST_CANCEL_PX) {
+                cancelActiveStroke();   // förra fingret vilade -> radera kort spår
+            } else {
+                flushPendingStrokes();  // förra fingret ritade på riktigt -> spara
+            }
+        } else {
+            flushPendingStrokes();
+        }
         lastX = coords.x;
         lastY = coords.y;
         strokeStartX = coords.x;
         strokeStartY = coords.y;
         strokeStartClientX = clientX;
         strokeStartClientY = clientY;
-        strokeMoved = false;
+        strokeCommitted = false;
         strokeUndoPushed = false;
         strokeHadOther = hadOther;
+        strokeExtent = 0;
         pendingPoints.length = 0;
         isDrawing = true;
         resetClearButton();
     }
 
     // Buffrar punkten och schemalägger rendering nästa frame. Flyttningar
-    // mindre än MOVE_THRESHOLD (jitter från vilande finger) ignoreras.
+    // mindre än STROKE_COMMIT_THRESHOLD (jitter/vilo-darr) ignoreras.
     function extendStrokeTo(coords, clientX, clientY) {
         if (!isDrawing) return;
-        if (!strokeMoved) {
-            const dx = clientX - strokeStartClientX;
-            const dy = clientY - strokeStartClientY;
-            if (dx * dx + dy * dy < MOVE_THRESHOLD * MOVE_THRESHOLD) return;
-            strokeMoved = true;
+        const dx = clientX - strokeStartClientX;
+        const dy = clientY - strokeStartClientY;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > strokeExtent) strokeExtent = distSq;
+        if (!strokeCommitted) {
+            if (distSq < STROKE_COMMIT_THRESHOLD * STROKE_COMMIT_THRESHOLD) return;
+            strokeCommitted = true;
             ensureStrokeUndo();
         }
         pendingPoints.push(coords.x, coords.y);
         scheduleRender();
     }
 
-    // Avslutar den aktiva ströken. En ren dutt (ingen flytt, ensamt finger)
+    // Avslutar den aktiva ströken. En ren dutt (ingen commit, ensamt finger)
     // ritar en prick vid startpunkten; ett vilande finger i multitouch ritar
     // ingenting (strokeHadOther true).
     function endStroke() {
         flushPendingStrokes();
-        if (!strokeMoved && !strokeHadOther) {
+        if (!strokeCommitted && !strokeHadOther) {
             ensureStrokeUndo();
             pCtx.beginPath();
             pCtx.fillStyle = currentColor;
@@ -330,12 +361,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     });
 
-    // Systemknappar (undo, clear) - även touchstart för multi-touch
+    // Systemknappar (undo, clear) - touchstart så de fungerar även när ett
+    // finger vilar på duken (click eldas inte vid multitouch på gamla Android).
+    // preventDefault hindrar efterföljande click (dubbel avfyrning); click
+    // finns kvar för mus/test på dator.
     const sysButtons = document.querySelectorAll('.sys-btn');
     sysButtons.forEach(btn => {
         btn.addEventListener('touchstart', function(e) {
             e.stopPropagation();
-        }, { passive: true });
+            if (this.id === 'undo-btn') undo();
+            else if (this.id === 'clear-btn') handleClearClick();
+            e.preventDefault();
+        }, { passive: false });
     });
 
     // Back-button hantering: förhindra att man hamnar på "svart startsida"
