@@ -83,18 +83,22 @@ gäller: commit-meddelanden på svenska, signera med
   knapparna lyfts upp direkt.
 - **Undo** lagras som `ImageData` via `getImageData`/`putImageData` (max 10).
   `pushUndo()` anropas i början av varje streck och inför RENSA.
-- **Start-overlay / fullscreen:** en "BÖRJA KLUDDA"-knapp triggar
-  `requestFullscreen()` och gömmer overlayen. Installerad app
-  (`isInstalledApp()` = standalone) hoppar över startskärmen. Om man lämnar
-  fullscreen (ej installerad) visas overlayen igen.
-- **Back-button:** `history.pushState`-fälla så Androids back-knapp inte
-  lämnar appen. Chromes "history manipulation intervention" hoppar över
-  poster skapade utan användargest, så fällan armeras med en post vid
-  `pointerdown` (= gest) och armeras om efter varje `popstate`. Utan detta
-  strandar en pinnad installerad app på en svart systemskärm vid bakåt.
+- **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") är appens
+  återhämtningsläge: den visas när fullscreen saknas (även i installerad
+  app) och vid bakåt-tryck. Knappen begär **alltid** `requestFullscreen()`
+  — även om `fullscreenElement` ser satt ut, eftersom Android kan tvinga
+  fram systemfälten (t.ex. vid pinning) utan att HTML-fullscreen formellt
+  släpps. Ritningen på papperet påverkas inte av att overlayen visas.
+- **Back-button:** bakåt får aldrig lämna sidan (pinnad installerad app
+  strandar annars på en svart systemskärm). Två lager, båda landar på
+  startskärmen: (1) Navigation API — `navigate`-eventet avbryter
+  traverseringar (kräver history-action activation, dvs. gest sedan förra
+  bakåt); (2) `history.pushState`-fälla — armeras med en post vid
+  `pointerdown` (= gest, annars skippar Chromes "history manipulation
+  intervention" den) och armeras om efter varje `popstate`.
 - **Fullscreen-återtagning (installerad app):** om HTML-fullscreen tappats
-  (t.ex. vägen via appväxlaren när man pinnar) begärs det igen vid nästa
-  `touchend` (användargest krävs). Misslyckas det tyst är det OK.
+  begärs det igen vid nästa `touchend` (användargest krävs). Misslyckas det
+  tyst är det OK — startskärmen visas ändå som återhämtningsväg.
 - `paper`-context skapas med `{ willReadFrequently: true }` (för snabbare
   `getImageData` till undo).
 

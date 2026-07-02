@@ -368,13 +368,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startApp() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.log(`Helskärm misslyckades: ${err.message}`);
-            });
-        }
+        // Begär alltid fullscreen — även om fullscreenElement ser satt ut.
+        // Android kan tvinga fram systemfälten (t.ex. vid skärmlåsning) utan
+        // att HTML-fullscreen formellt släpps; en ny begäran med gest rättar
+        // till läget, och är den redan i fullscreen händer inget.
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Helskärm misslyckades: ${err.message}`);
+        });
         document.getElementById('start-overlay').style.display = 'none';
         setTimeout(applyLayout, 100);
+    }
+
+    // Startskärmen fungerar som återhämtningsläge: den visas vid bakåt-tryck
+    // och när fullscreen tappats, och BÖRJA KLUDDA-knappen (en äkta gest) tar
+    // tillbaka in i fullscreen. Ritningen på papperet påverkas inte.
+    function showStartOverlay() {
+        document.getElementById('start-overlay').style.display = 'flex';
+        resetClearButton();
     }
 
     // --- Händelsebindningar (tidigare inline i HTML) ---
@@ -411,17 +421,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Back-knapp: håll användaren kvar i appen ---
-    // Chromes "history manipulation intervention" hoppar över history-poster
-    // som skapats UTAN användargest när användaren trycker bakåt — då lämnas
-    // appen trots pushState-fällan (och i pinnat läge strandar man på en svart
-    // systemskärm som inte går att komma ur utan att avpinna). Fällan armeras
-    // därför med en gest-skapad post vid nästa touch, och armeras om efter
-    // varje bakåt-tryck.
+    // Bakåt får aldrig lämna sidan — i pinnat läge strandar den installerade
+    // appen annars på en svart systemskärm. Två skyddslager, båda landar på
+    // startskärmen i stället för att lämna appen:
+    //
+    // 1) Navigation API (nyare Chrome): avbryter bakåt-navigeringen helt.
+    //    Kräver "history-action activation" (beviljas av användargest,
+    //    förbrukas per avbruten navigering) — upprepade bakåt utan touch
+    //    emellan släpps vidare till lager 2.
+    // 2) pushState-fälla: fångar traverseringen och pushar tillbaka. Chromes
+    //    "history manipulation intervention" hoppar över poster skapade utan
+    //    användargest, så fällan armeras med en post vid pointerdown (= gest)
+    //    och armeras om efter varje popstate.
+    if (window.navigation) {
+        navigation.addEventListener('navigate', (e) => {
+            if (e.navigationType === 'traverse' && e.cancelable) {
+                e.preventDefault();
+                showStartOverlay();
+            }
+        });
+    }
+
     let backTrapNeedsArm = true;
     history.pushState(null, '', location.href);
     window.addEventListener('popstate', () => {
         history.pushState(null, '', location.href); // fångar utan gest (äldre Chrome)
         backTrapNeedsArm = true;
+        showStartOverlay();
     });
     document.addEventListener('pointerdown', () => {
         if (backTrapNeedsArm) {
@@ -436,11 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('fullscreenchange', () => {
-        // Installerad app: ingen startskärm, men layouten måste ändå räknas
-        // om — skärmlåsning (pinning) kan tvinga appen ur fullscreen.
-        if (!isInstalledApp()) {
-            document.getElementById('start-overlay').style.display =
-                document.fullscreenElement ? 'none' : 'flex';
+        // Startskärmen visas när fullscreen saknas — även i installerad app,
+        // så att BÖRJA KLUDDA (en gest) alltid kan återta fullscreen, t.ex.
+        // efter att skärmlåsning (pinning) kastat ut appen ur det.
+        if (document.fullscreenElement) {
+            document.getElementById('start-overlay').style.display = 'none';
+        } else {
+            showStartOverlay();
         }
         setTimeout(applyLayout, 100);
     });
