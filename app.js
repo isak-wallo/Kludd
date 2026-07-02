@@ -31,6 +31,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Layoutlås
     let lockedW = 0, lockedH = 0;
     let lockLandscape = null;
+    let shrinkTimer = null;
+
+    // Hur länge (ms) en MINDRE layout-viewport måste bestå innan låset
+    // släpper och appen krymper till den. Transienta systemfält i immersive
+    // fullscreen ändrar aldrig innerWidth/innerHeight och triggar inte detta.
+    // En bestående mindre viewport är ett äkta lägesbyte — t.ex. skärmlåsning
+    // (pinning) som tvingar fram status-/navigeringsfält och förskjuter hela
+    // fönstret nedåt så knapparna annars klipps vid skärmens nederkant.
+    const SHRINK_ADOPT_MS = 400;
 
     function applyLayout() {
         const isLandscape = window.innerWidth > window.innerHeight;
@@ -41,20 +50,39 @@ document.addEventListener('DOMContentLoaded', () => {
             lockLandscape = isLandscape;
             lockedW = w;
             lockedH = h;
+            if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
         } else {
             if (w > lockedW) lockedW = w;
             if (h > lockedH) lockedH = h;
+        }
+
+        // Mindre viewport än låset? Anta den nya storleken om den består.
+        if (w < lockedW || h < lockedH) {
+            if (shrinkTimer) clearTimeout(shrinkTimer);
+            shrinkTimer = setTimeout(() => {
+                shrinkTimer = null;
+                const w2 = window.innerWidth;
+                const h2 = window.innerHeight;
+                if ((w2 > h2) === lockLandscape && (w2 < lockedW || h2 < lockedH)) {
+                    lockedW = w2;
+                    lockedH = h2;
+                    applyLayout();
+                }
+            }, SHRINK_ADOPT_MS);
         }
 
         const app = document.getElementById('app');
         if (app) {
             app.style.width = lockedW + 'px';
             app.style.height = lockedH + 'px';
-            // Reservera plats för nedre systemfältet (synligt i t.ex. screen
-            // pinning) genom att mäta skillnaden mellan layout-viewport och
-            // visual viewport. I immersive fullscreen är skillnaden 0.
+            // Reservera plats för nedre systemfältet genom att jämföra appens
+            // LÅSTA höjd med visual viewport. Det fångar både fält som täcker
+            // layout-viewporten och lägen där hela fönstret krympt/förskjutits
+            // medan låset ännu är större (skärmlåsning innan krympningen ovan
+            // hunnit antas) — knapparna lyfts då upp direkt. I immersive
+            // fullscreen är skillnaden 0.
             if (window.visualViewport) {
-                const bottomBar = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+                const bottomBar = lockedH - window.visualViewport.height - window.visualViewport.offsetTop;
                 app.style.paddingBottom = bottomBar > 0 ? bottomBar + 'px' : '';
             }
         }
@@ -397,11 +425,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('fullscreenchange', () => {
-        if (isInstalledApp()) return; // Installerad app: ingen startskärm
-        if (!document.fullscreenElement) {
-            document.getElementById('start-overlay').style.display = 'flex';
-        } else {
-            document.getElementById('start-overlay').style.display = 'none';
+        // Installerad app: ingen startskärm, men layouten måste ändå räknas
+        // om — skärmlåsning (pinning) kan tvinga appen ur fullscreen.
+        if (!isInstalledApp()) {
+            document.getElementById('start-overlay').style.display =
+                document.fullscreenElement ? 'none' : 'flex';
         }
         setTimeout(applyLayout, 100);
     });
@@ -434,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', debouncedLayout);
+        window.visualViewport.addEventListener('scroll', debouncedLayout);
     }
 
     applyLayout();

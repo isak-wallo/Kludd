@@ -73,8 +73,14 @@ gäller: commit-meddelanden på svenska, signera med
   den *största* uppmätta skärmstorleken så statusfält som dyker upp/försvinner
   inte ändrar ritytans storlek. Resize/rotation/orientation/visualViewport
   är debouncade till en omräkning per frame (`debouncedLayout`).
-  *Specialfall:* i fullscreen-läge ignoreras visualViewport-resizes < 60 px
-  (annars triggar mobilens statusfältsvisning onödiga layout-omräkningar).
+  *Krympning:* en **mindre** layout-viewport som består i `SHRINK_ADOPT_MS`
+  (400 ms) antas som nytt lås — krävs för skärmlåsning (pinning) i
+  installerad app, där Android tvingar fram status-/navigeringsfält och
+  förskjuter hela fönstret (annars klipps knapparna vid nederkanten).
+  Transienta fält i immersive fullscreen ändrar inte `innerHeight` och
+  triggar aldrig krympningen. Som brygga tills krympningen antagits sätts
+  `padding-bottom` = `lockedH - visualViewport.height - offsetTop`, så
+  knapparna lyfts upp direkt.
 - **Undo** lagras som `ImageData` via `getImageData`/`putImageData` (max 10).
   `pushUndo()` anropas i början av varje streck och inför RENSA.
 - **Start-overlay / fullscreen:** en "BÖRJA KLUDDA"-knapp triggar
