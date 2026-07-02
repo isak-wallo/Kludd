@@ -87,8 +87,14 @@ gäller: commit-meddelanden på svenska, signera med
   `requestFullscreen()` och gömmer overlayen. Installerad app
   (`isInstalledApp()` = standalone) hoppar över startskärmen. Om man lämnar
   fullscreen (ej installerad) visas overlayen igen.
-- **Back-button:** `history.pushState` vid start + `popstate` pushar igen så
-  Androids back-knapp inte lämnar appen.
+- **Back-button:** `history.pushState`-fälla så Androids back-knapp inte
+  lämnar appen. Chromes "history manipulation intervention" hoppar över
+  poster skapade utan användargest, så fällan armeras med en post vid
+  `pointerdown` (= gest) och armeras om efter varje `popstate`. Utan detta
+  strandar en pinnad installerad app på en svart systemskärm vid bakåt.
+- **Fullscreen-återtagning (installerad app):** om HTML-fullscreen tappats
+  (t.ex. vägen via appväxlaren när man pinnar) begärs det igen vid nästa
+  `touchend` (användargest krävs). Misslyckas det tyst är det OK.
 - `paper`-context skapas med `{ willReadFrequently: true }` (för snabbare
   `getImageData` till undo).
 

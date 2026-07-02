@@ -410,14 +410,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: false });
     });
 
-    // Back-button hantering: förhindra att man hamnar på "svart startsida"
-    // Push state vid start så back-button stannar i appen
+    // --- Back-knapp: håll användaren kvar i appen ---
+    // Chromes "history manipulation intervention" hoppar över history-poster
+    // som skapats UTAN användargest när användaren trycker bakåt — då lämnas
+    // appen trots pushState-fällan (och i pinnat läge strandar man på en svart
+    // systemskärm som inte går att komma ur utan att avpinna). Fällan armeras
+    // därför med en gest-skapad post vid nästa touch, och armeras om efter
+    // varje bakåt-tryck.
+    let backTrapNeedsArm = true;
     history.pushState(null, '', location.href);
-    window.addEventListener('popstate', (e) => {
-        history.pushState(null, '', location.href);
-        // Valfritt: visa start-overlay istället för att lämna appen
-        // document.getElementById('start-overlay').style.display = 'flex';
+    window.addEventListener('popstate', () => {
+        history.pushState(null, '', location.href); // fångar utan gest (äldre Chrome)
+        backTrapNeedsArm = true;
     });
+    document.addEventListener('pointerdown', () => {
+        if (backTrapNeedsArm) {
+            backTrapNeedsArm = false;
+            history.pushState(null, '', location.href);
+        }
+    }, { capture: true, passive: true });
 
     // Lås orientering till porträtt (kräver fullscreen/standalone)
     if (screen.orientation && screen.orientation.lock) {
@@ -433,6 +444,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setTimeout(applyLayout, 100);
     });
+
+    // Installerad app: återta immersive fullscreen (dolda systemfält) vid
+    // touch om det tappats — t.ex. efter skärmlåsning (pinning), där vägen
+    // via appväxlaren kastar ut appen ur fullscreen. Kräver användargest,
+    // därför på touchend. Nekar Android (t.ex. immersive förbjudet i pinnat
+    // läge på vissa versioner) händer inget — layouten klarar sig ändå.
+    window.addEventListener('touchend', () => {
+        if (isInstalledApp() && !document.fullscreenElement && document.fullscreenEnabled) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    }, { passive: true });
 
     viewCanvas.addEventListener('mousedown', onMouseDown);
     viewCanvas.addEventListener('mousemove', onMouseMove);
