@@ -91,14 +91,19 @@ gäller: commit-meddelanden på svenska, signera med
   HTML-fullscreen formellt släpps. Ritningen på papperet påverkas inte av
   att overlayen visas.
 - **Back-button:** bakåt får aldrig lämna sidan (pinnad installerad app
-  strandar annars på en svart systemskärm). Två lager: (1) Navigation API —
-  `navigate`-eventet avbryter traverseringar **helt tyst**, ritytan lämnas
-  inte (kräver history-action activation, dvs. gest sedan förra bakåt);
-  (2) `history.pushState`-fälla — armeras med en post vid `pointerdown`
-  (= gest, annars skippar Chromes "history manipulation intervention" den),
-  armeras om efter varje `popstate` och visar startskärmen som
-  återhämtning. Obs: i HTML-fullscreen är Chromes *första* bakåt-åtgärd att
-  lämna helskärmen — kan inte blockeras; hanteras av återtagningen nedan.
+  strandar annars på WebAPK:ns splash-skärm). Huvudskyddet är en
+  **gest-armerad pushState-buffert**: vid `pointerdown` fylls historiken
+  med poster (samma URL, märkta `kluddDepth`) upp till `MAX_TRAP_DEPTH`.
+  Poster skapade med gest respekteras av Chromes "history manipulation
+  intervention", så varje bakåt kliver bara ner ett steg i bufferten —
+  helt tyst, ritytan lämnas inte — och nästa touch fyller på igen. Först
+  på botten visas startskärmen + en sista fångstpost. **Pusha aldrig i
+  `popstate` annat än på botten** — poster skapade där (utan gest) flaggas
+  av interventionen och nästa bakåt lämnar då sidan (= splash-strandning).
+  Navigation API-lagret (`navigate` + `preventDefault`) finns kvar men
+  Androids system-bakåt undantas av Chrome, så det hjälper mest på desktop.
+  Obs: i HTML-fullscreen är Chromes *första* bakåt-åtgärd att lämna
+  helskärmen — kan inte blockeras; hanteras av återtagningen nedan.
 - **Fullscreen-återtagning (installerad app):** om HTML-fullscreen tappats
   (bakåt-tryck, pinning-svängen via appväxlaren) begärs det igen **tyst**
   vid nästa `touchend` (användargest krävs) — ingen startskärm visas,

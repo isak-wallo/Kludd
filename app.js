@@ -422,21 +422,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Back-knapp: håll användaren kvar i appen ---
     // Bakåt får aldrig lämna sidan — i pinnat läge strandar den installerade
-    // appen annars på en svart systemskärm. Två skyddslager:
+    // appen annars på WebAPK:ns svarta splash-skärm, som bara går att lämna
+    // genom att avpinna. Skydd i två lager:
     //
-    // 1) Navigation API (nyare Chrome): avbryter bakåt-navigeringen HELT
-    //    TYST — ritytan lämnas inte alls. Kräver "history-action activation"
-    //    (beviljas av användargest, förbrukas per avbruten navigering) —
-    //    upprepade bakåt utan touch emellan släpps vidare till lager 2.
-    // 2) pushState-fälla: fångar traverseringen, pushar tillbaka och visar
-    //    startskärmen som återhämtning. Chromes "history manipulation
-    //    intervention" hoppar över poster skapade utan användargest, så
-    //    fällan armeras med en post vid pointerdown (= gest) och armeras om
-    //    efter varje popstate.
-    //
-    // Obs: är appen i HTML-fullscreen är Chromes FÖRSTA bakåt-åtgärd att
-    // lämna helskärmen — det kan en sida inte blockera. Installerad app
-    // återtar den tyst vid nästa touch (se touchend-lyssnaren nedan).
+    // 1) Navigation API: avbryter traverseringen helt tyst. Androids
+    //    system-bakåt undantas dock av Chrome (den ska alltid "fungera"),
+    //    så i praktiken skyddar detta mest vid test i desktop-Chrome.
+    // 2) Gest-armerad pushState-buffert: vid touch fylls historiken på med
+    //    poster (samma URL, märkta med kluddDepth) upp till MAX_TRAP_DEPTH.
+    //    Poster skapade MED gest respekteras av Chromes "history
+    //    manipulation intervention", så varje bakåt-tryck kliver bara ner
+    //    ett steg i bufferten — osynligt för användaren, ritytan lämnas
+    //    inte. Nästa touch fyller på bufferten igen. Först på botten
+    //    (poster utan kluddDepth) visas startskärmen och en sista
+    //    fångstpost pushas. OBS: pushState inne i popstate (= utan gest)
+    //    flaggas av interventionen så att NÄSTA bakåt lämnar sidan — därför
+    //    görs det enbart som sista utväg på botten, aldrig i bufferten.
+    const MAX_TRAP_DEPTH = 8;
+    let backTrapNeedsArm = true;
+
     if (window.navigation) {
         navigation.addEventListener('navigate', (e) => {
             if (e.navigationType === 'traverse' && e.cancelable) {
@@ -445,17 +449,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    let backTrapNeedsArm = true;
-    history.pushState(null, '', location.href);
-    window.addEventListener('popstate', () => {
-        history.pushState(null, '', location.href); // fångar utan gest (äldre Chrome)
+    history.pushState(null, '', location.href); // grundfälla (utan gest)
+
+    window.addEventListener('popstate', (e) => {
         backTrapNeedsArm = true;
+        if (e.state && typeof e.state.kluddDepth === 'number') {
+            return; // landade i bufferten — tyst, barnet ritar vidare
+        }
+        history.pushState(null, '', location.href);
         showStartOverlay();
     });
+
     document.addEventListener('pointerdown', () => {
-        if (backTrapNeedsArm) {
-            backTrapNeedsArm = false;
-            history.pushState(null, '', location.href);
+        if (!backTrapNeedsArm) return;
+        backTrapNeedsArm = false;
+        let depth = (history.state && typeof history.state.kluddDepth === 'number')
+            ? history.state.kluddDepth + 1 : 0;
+        while (depth < MAX_TRAP_DEPTH) {
+            history.pushState({ kluddDepth: depth }, '', location.href);
+            depth++;
         }
     }, { capture: true, passive: true });
 
