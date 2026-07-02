@@ -422,22 +422,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Back-knapp: håll användaren kvar i appen ---
     // Bakåt får aldrig lämna sidan — i pinnat läge strandar den installerade
-    // appen annars på en svart systemskärm. Två skyddslager, båda landar på
-    // startskärmen i stället för att lämna appen:
+    // appen annars på en svart systemskärm. Två skyddslager:
     //
-    // 1) Navigation API (nyare Chrome): avbryter bakåt-navigeringen helt.
-    //    Kräver "history-action activation" (beviljas av användargest,
-    //    förbrukas per avbruten navigering) — upprepade bakåt utan touch
-    //    emellan släpps vidare till lager 2.
-    // 2) pushState-fälla: fångar traverseringen och pushar tillbaka. Chromes
-    //    "history manipulation intervention" hoppar över poster skapade utan
-    //    användargest, så fällan armeras med en post vid pointerdown (= gest)
-    //    och armeras om efter varje popstate.
+    // 1) Navigation API (nyare Chrome): avbryter bakåt-navigeringen HELT
+    //    TYST — ritytan lämnas inte alls. Kräver "history-action activation"
+    //    (beviljas av användargest, förbrukas per avbruten navigering) —
+    //    upprepade bakåt utan touch emellan släpps vidare till lager 2.
+    // 2) pushState-fälla: fångar traverseringen, pushar tillbaka och visar
+    //    startskärmen som återhämtning. Chromes "history manipulation
+    //    intervention" hoppar över poster skapade utan användargest, så
+    //    fällan armeras med en post vid pointerdown (= gest) och armeras om
+    //    efter varje popstate.
+    //
+    // Obs: är appen i HTML-fullscreen är Chromes FÖRSTA bakåt-åtgärd att
+    // lämna helskärmen — det kan en sida inte blockera. Installerad app
+    // återtar den tyst vid nästa touch (se touchend-lyssnaren nedan).
     if (window.navigation) {
         navigation.addEventListener('navigate', (e) => {
             if (e.navigationType === 'traverse' && e.cancelable) {
                 e.preventDefault();
-                showStartOverlay();
             }
         });
     }
@@ -462,22 +465,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('fullscreenchange', () => {
-        // Startskärmen visas när fullscreen saknas — även i installerad app,
-        // så att BÖRJA KLUDDA (en gest) alltid kan återta fullscreen, t.ex.
-        // efter att skärmlåsning (pinning) kastat ut appen ur det.
         if (document.fullscreenElement) {
             document.getElementById('start-overlay').style.display = 'none';
-        } else {
+        } else if (!isInstalledApp()) {
+            // Webbläsarläge: startskärmen är enda vägen tillbaka till
+            // fullscreen. Installerad app visar INGEN startskärm här utan
+            // återtar fullscreen tyst vid nästa touch — så bakåt-knappen
+            // (som kastar ut ur helskärm) inte lämnar ritytan.
             showStartOverlay();
         }
         setTimeout(applyLayout, 100);
     });
 
-    // Installerad app: återta immersive fullscreen (dolda systemfält) vid
-    // touch om det tappats — t.ex. efter skärmlåsning (pinning), där vägen
-    // via appväxlaren kastar ut appen ur fullscreen. Kräver användargest,
-    // därför på touchend. Nekar Android (t.ex. immersive förbjudet i pinnat
-    // läge på vissa versioner) händer inget — layouten klarar sig ändå.
+    // Installerad app: återta immersive fullscreen (dolda systemfält) tyst
+    // vid touch om det tappats — efter bakåt-tryck (som kastar ut ur helskärm
+    // utan att kunna blockeras) eller skärmlåsningens väg via appväxlaren.
+    // Barnet ritar bara vidare; fälten döljs igen vid nästa tryck. Kräver
+    // användargest, därför på touchend. Nekar Android (t.ex. immersive
+    // förbjudet i pinnat läge på vissa versioner) händer inget — layouten
+    // klarar sig ändå.
     window.addEventListener('touchend', () => {
         if (isInstalledApp() && !document.fullscreenElement && document.fullscreenEnabled) {
             document.documentElement.requestFullscreen().catch(() => {});

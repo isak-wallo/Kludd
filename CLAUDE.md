@@ -83,22 +83,27 @@ gäller: commit-meddelanden på svenska, signera med
   knapparna lyfts upp direkt.
 - **Undo** lagras som `ImageData` via `getImageData`/`putImageData` (max 10).
   `pushUndo()` anropas i början av varje streck och inför RENSA.
-- **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") är appens
-  återhämtningsläge: den visas när fullscreen saknas (även i installerad
-  app) och vid bakåt-tryck. Knappen begär **alltid** `requestFullscreen()`
-  — även om `fullscreenElement` ser satt ut, eftersom Android kan tvinga
-  fram systemfälten (t.ex. vid pinning) utan att HTML-fullscreen formellt
-  släpps. Ritningen på papperet påverkas inte av att overlayen visas.
+- **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") visas vid
+  appstart, i webbläsarläge när fullscreen saknas, och som reserv när
+  bakåt-fällans `popstate` triggas. Knappen begär **alltid**
+  `requestFullscreen()` — även om `fullscreenElement` ser satt ut, eftersom
+  Android kan tvinga fram systemfälten (t.ex. vid pinning) utan att
+  HTML-fullscreen formellt släpps. Ritningen på papperet påverkas inte av
+  att overlayen visas.
 - **Back-button:** bakåt får aldrig lämna sidan (pinnad installerad app
-  strandar annars på en svart systemskärm). Två lager, båda landar på
-  startskärmen: (1) Navigation API — `navigate`-eventet avbryter
-  traverseringar (kräver history-action activation, dvs. gest sedan förra
-  bakåt); (2) `history.pushState`-fälla — armeras med en post vid
-  `pointerdown` (= gest, annars skippar Chromes "history manipulation
-  intervention" den) och armeras om efter varje `popstate`.
+  strandar annars på en svart systemskärm). Två lager: (1) Navigation API —
+  `navigate`-eventet avbryter traverseringar **helt tyst**, ritytan lämnas
+  inte (kräver history-action activation, dvs. gest sedan förra bakåt);
+  (2) `history.pushState`-fälla — armeras med en post vid `pointerdown`
+  (= gest, annars skippar Chromes "history manipulation intervention" den),
+  armeras om efter varje `popstate` och visar startskärmen som
+  återhämtning. Obs: i HTML-fullscreen är Chromes *första* bakåt-åtgärd att
+  lämna helskärmen — kan inte blockeras; hanteras av återtagningen nedan.
 - **Fullscreen-återtagning (installerad app):** om HTML-fullscreen tappats
-  begärs det igen vid nästa `touchend` (användargest krävs). Misslyckas det
-  tyst är det OK — startskärmen visas ändå som återhämtningsväg.
+  (bakåt-tryck, pinning-svängen via appväxlaren) begärs det igen **tyst**
+  vid nästa `touchend` (användargest krävs) — ingen startskärm visas,
+  barnet ritar bara vidare. Nekar Android händer inget; layoutlåset håller
+  ändå knapparna synliga.
 - `paper`-context skapas med `{ willReadFrequently: true }` (för snabbare
   `getImageData` till undo).
 
