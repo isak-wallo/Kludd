@@ -50,6 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (app) {
             app.style.width = lockedW + 'px';
             app.style.height = lockedH + 'px';
+            // Reservera plats för nedre systemfältet (synligt i t.ex. screen
+            // pinning) genom att mäta skillnaden mellan layout-viewport och
+            // visual viewport. I immersive fullscreen är skillnaden 0.
+            if (window.visualViewport) {
+                const bottomBar = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+                app.style.paddingBottom = bottomBar > 0 ? bottomBar + 'px' : '';
+            }
         }
         resizeCanvas();
     }
