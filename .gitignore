@@ -1,5 +1,11 @@
+# Ignorera sig själv (så .gitignore inte spåras av git)
+.gitignore
+
 # Claude Code lokala inställningar
 .claude/
+
+# Arbetsmaterial (skisser, anteckningar, etc.)
+.arbetsmaterial/
 
 # OS / skrivbords-skräp
 Thumbs.db
