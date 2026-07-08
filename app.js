@@ -22,11 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let undoStack = [];
 
     // --- Håll-in-logik för systemknappar (ÅNGRA / RENSA) ---
-    // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 2 s) för att
+    // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 1,5 s) för att
     // aktiveras. RENSA har kvar sin tvåstegsbekräftelse: första hållningen
     // visar SÄKER?, andra hållningen tömmer duken. En kort tryckning gör inget
     // — det förhindrar att ett barn råkar rensa/ångra vid missögon.
-    const HOLD_MS = 2000;
+    const HOLD_MS = 1500;
     let holdTimer = null;
     let holdTarget = null;     // vilken knapp som hålls ('undo' | 'clear')
     let holdFired = false;      // har aktiveringen redan skett för denna hållning?
@@ -67,6 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // fönstret nedåt så knapparna annars klipps vid skärmens nederkant.
     const SHRINK_ADOPT_MS = 400;
 
+    // Statisk dö-yta i botten: en permanent svart remsa som alltid finns
+    // där. Garanterar att Androids systemknappar (bakåt/hem/översikt) hamnar
+    // framför svart dö-yta istället för framför knapparna eller nedersta
+    // delen av ritytan. safe-area-inset fungerar inte i installerad standalone-
+    // app (inset = 0), därför en fast remsa. 48 px ≈ en systemknappshöjd.
+    const DEAD_ZONE_BOTTOM = 48;
+
     function applyLayout() {
         const isLandscape = window.innerWidth > window.innerHeight;
         const w = window.innerWidth;
@@ -101,16 +108,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (app) {
             app.style.width = lockedW + 'px';
             app.style.height = lockedH + 'px';
-            // Reservera plats för nedre systemfältet genom att jämföra appens
-            // LÅSTA höjd med visual viewport. Det fångar både fält som täcker
-            // layout-viewporten och lägen där hela fönstret krympt/förskjutits
-            // medan låset ännu är större (skärmlåsning innan krympningen ovan
-            // hunnit antas) — knapparna lyfts då upp direkt. I immersive
-            // fullscreen är skillnaden 0.
+            // Dö-yta i botten: alltid DEAD_ZONE_BOTTOM (statisk svart remsa)
+            // + extra om visualViewport indikerar att systemfälten syns (t.ex.
+            // vid skärmlåsning/pinning där hela fönstret förskjuts). I immersive
+            // fullscreen är den dynamiska delen 0 — bara den statiska remsan
+            // finns, vilket är ett medvetet val för att alltid skydda knapparna.
+            let bottomBar = DEAD_ZONE_BOTTOM;
             if (window.visualViewport) {
-                const bottomBar = lockedH - window.visualViewport.height - window.visualViewport.offsetTop;
-                app.style.paddingBottom = bottomBar > 0 ? bottomBar + 'px' : '';
+                const dyn = lockedH - window.visualViewport.height - window.visualViewport.offsetTop;
+                if (dyn > 0) bottomBar += dyn;
             }
+            app.style.paddingBottom = bottomBar + 'px';
         }
         resizeCanvas();
     }

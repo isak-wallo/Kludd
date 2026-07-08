@@ -25,6 +25,7 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background-color: #000;  /* dö-yta (padding-bottom) blir svart */
 }
 @media (orientation: landscape) {
     #app {
@@ -99,22 +100,9 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    background-color: #000;
+    background-color: #1c1c1e;
     padding: 6px;
     gap: 6px;
-}
-/* Safe-area runt panelen: trycker in knapparna från systemfälten på alla
-   sidor (telefon: sidorna, tablet: botten). Svart bakgrund = dö-yta så
-   fälten hamnar framför den istället för framför knapparna. I immersive
-   fullscreen är inset 0 → ingen dö-yta. Måste ligga EFTER basregeln
-   ovan för att vinna kaskaden. */
-@supports (padding: env(safe-area-inset-top)) {
-    #button-container {
-        padding-top: calc(env(safe-area-inset-top) + 6px);
-        padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
-        padding-left: calc(env(safe-area-inset-left) + 6px);
-        padding-right: calc(env(safe-area-inset-right) + 6px);
-    }
 }
 @media (orientation: landscape) {
     #button-container {
@@ -204,7 +192,7 @@ body {
 }
 
 /* Håll-in-feedback: en rad växer uppifrån/nedifrån och fylls på medan
-   fingret hålls. När den fyllt knappen (efter HOLD_MS = 2 s) aktiveras
+   fingret hålls. När den fyllt knappen (efter HOLD_MS = 1,5 s) aktiveras
    funktionen. Visar barnet att man ska hålla kvar. */
 .sys-btn.holding::after {
     content: '';
@@ -214,7 +202,7 @@ body {
     width: 100%;
     height: 0;
     background-color: rgba(255, 255, 255, 0.35);
-    animation: hold-fill 2s linear forwards;
+    animation: hold-fill 1.5s linear forwards;
     pointer-events: none;
 }
 @keyframes hold-fill {

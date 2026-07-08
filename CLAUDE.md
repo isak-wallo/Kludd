@@ -8,11 +8,11 @@ och användas av barn. Språk i appen och i koden (kommentarer, knappnamn) är
 
 - Fullskärmsritapp med 6 färger (svart, röd, gul, blå, grön, lila), fast
   penselbredd (16 px på "papperet") och rundad pensel.
-- **ÅNGRA** — ångra upp till 10 streck (`MAX_UNDO`). Håll in knappen i 2 s
+- **ÅNGRA** — ångra upp till 10 streck (`MAX_UNDO`). Håll in knappen i 1,5 s
   (`HOLD_MS`) för att aktivera; ett kort tryck gör inget.
-- **RENSA** — tvåstegs bekräftelse med hållning: första hållningen (2 s)
+- **RENSA** — tvåstegs bekräftelse med hållning: första hållningen (1,5 s)
   visar "SÄKER?" (röd, 5 s timeout / nollställs vid nytt ritstreck), andra
-  hållningen (2 s) tömmer duken.
+  hållningen (1,5 s) tömmer duken.
 - Låser orientering till **landskap**, går i fullscreen och "naglar fast"
   layouten så systemfälten (statusfält) inte kan trycka undan ritytan.
 - Fungerar **offline** som installerad PWA (service worker cachar allt).
@@ -86,20 +86,22 @@ gäller: commit-meddelanden på svenska, signera med
 - **Undo** lagras som `ImageData` via `getImageData`/`putImageData` (max 10).
   `pushUndo()` anropas i början av varje streck och inför RENSA.
 - **Håll-in-knappar (`HOLD_MS`):** ÅNGRA och RENSA kräver att fingret hålls
-  intryckt i 2 s (`HOLD_MS`) för att aktiveras — ett kort tryck gör inget,
+  intryckt i 1,5 s (`HOLD_MS`) för att aktiveras — ett kort tryck gör inget,
   så ett barn inte råkar ångra/rensa vid missögon. Hållningen styrs av
   `startHold`/`endHold` med en `setTimeout`; CSS-klassen `.holding` visar
-  en progress-animasjon (`hold-fill`) som fylls uppåt över 2 s så barnet
+  en progress-animasjon (`hold-fill`) som fylls uppåt över 1,5 s så barnet
   ser att man ska hålla kvar. RENSA behåller sin tvåstegsbekräftelse:
   första hållningen visar SÄKER?, andra hållningen tömmer duken.
-- **Dö-yta runt knappanelen:** `#button-container` har
-  `env(safe-area-inset-*)` som padding på alla fyra sidor och svart
-  bakgrund. Systemfälten (som kan dyka upp på vilken sida som helst när
-  barnet råkar dra fram dem — telefon: sidorna, tablet: botten) hamnar
-  framför svart dö-yta istället för framför knapparna. I immersive
-  fullscreen är inset 0 → ingen dö-yta. `#app`:s layoutlås-padding
-  (`padding-bottom` vid pinning) finns kvar som backup för
-  skärmlåsningsläget där hela fönstret förskjuts.
+- **Dö-yta i botten:** `applyLayout` sätter `padding-bottom` på `#app` till
+  alltid minst `DEAD_ZONE_BOTTOM` (48 px ≈ en systemknappshöjd) — en
+  permanent svart remsa i botten (`#app` har `background-color: #000`).
+  Garanterar att Androids systemknappar (bakåt/hem/översikt), som kan dyka
+  upp transient i installerad standalone-app utan att JavaScript kan
+  detektera dem, hamnar framför svart dö-yta istället för framför
+  knapparna eller nedersta delen av ritytan. safe-area-inset fungerar inte
+  i standalone-läge (inset = 0), därför en fast remsa. Utöver den statiska
+  remsan läggs extra padding till om `visualViewport` indikerar synliga
+  systemfält (t.ex. vid skärmlåsning/pinning där hela fönstret förskjuts).
 - **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") visas vid
   appstart, i webbläsarläge när fullscreen saknas, och som reserv när
   bakåt-fällans `popstate` triggas. Knappen begär **alltid**
