@@ -21,6 +21,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_UNDO = 10;   // Hur många steg bakåt man kan ångra
     let undoStack = [];
 
+    // --- Håll-in-logik för systemknappar (ÅNGRA / RENSA) ---
+    // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 2 s) för att
+    // aktiveras. RENSA har kvar sin tvåstegsbekräftelse: första hållningen
+    // visar SÄKER?, andra hållningen tömmer duken. En kort tryckning gör inget
+    // — det förhindrar att ett barn råkar rensa/ångra vid missögon.
+    const HOLD_MS = 2000;
+    let holdTimer = null;
+    let holdTarget = null;     // vilken knapp som hålls ('undo' | 'clear')
+    let holdFired = false;      // har aktiveringen redan skett för denna hållning?
+
+    function startHold(target) {
+        if (holdTimer) clearTimeout(holdTimer);
+        holdTarget = target;
+        holdFired = false;
+        holdTimer = setTimeout(() => {
+            holdFired = true;
+            if (target === 'undo') undo();
+            else handleClear();
+        }, HOLD_MS);
+    }
+
+    function endHold() {
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        holdTarget = null;
+    }
+
     function resizeCanvas() {
         if (!canvasContainer) return;
         viewCanvas.width = canvasContainer.clientWidth;
@@ -311,7 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
         resetClearButton();
     }
 
-    function handleClearClick() {
+    // RENSA — tvåstegs med hållning: första hållningen (2 s) visar "SÄKER?"
+    // (röd, 5 s timeout / nollställs vid nytt ritstreck), andra hållningen
+    // (2 s) tömmer duken.
+    function handleClear() {
         const btn = document.getElementById('clear-btn');
         if (clearState === 0) {
             clearState = 1;
@@ -389,8 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Händelsebindningar (tidigare inline i HTML) ---
     document.getElementById('start-btn').addEventListener('click', startApp);
-    document.getElementById('undo-btn').addEventListener('click', undo);
-    document.getElementById('clear-btn').addEventListener('click', handleClearClick);
 
     const colorBoxes = document.querySelectorAll('.color-box');
     colorBoxes.forEach(box => {
@@ -406,19 +433,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     });
 
-    // Systemknappar (undo, clear) - touchstart så de fungerar även när ett
-    // finger vilar på duken (click eldas inte vid multitouch på gamla Android).
-    // preventDefault hindrar efterföljande click (dubbel avfyrning); click
-    // finns kvar för mus/test på dator.
-    const sysButtons = document.querySelectorAll('.sys-btn');
-    sysButtons.forEach(btn => {
-        btn.addEventListener('touchstart', function(e) {
-            e.stopPropagation();
-            if (this.id === 'undo-btn') undo();
-            else if (this.id === 'clear-btn') handleClearClick();
-            e.preventDefault();
-        }, { passive: false });
+    // Systemknappar (undo, clear) — håll in HOLD_MS (ca 2 s) för att aktivera.
+    // RENSA har tvåstegs: första hållningen visar SÄKER?, andra hållningen
+    // tömmer duken. Touchstart på knapparna stopPropagates så de inte startar
+    // ett streck; click finns kvar för mus/test på dator (håll via mousedown).
+    const undoBtn = document.getElementById('undo-btn');
+    const clearBtn = document.getElementById('clear-btn');
+
+    function holdStart(target) {
+        const btn = (target === 'undo') ? undoBtn : clearBtn;
+        if (btn.disabled) return;
+        startHold(target);
+        btn.classList.add('holding');
+    }
+    function holdEnd() {
+        endHold();
+        undoBtn.classList.remove('holding');
+        clearBtn.classList.remove('holding');
+    }
+
+    undoBtn.addEventListener('touchstart', function(e) {
+        e.stopPropagation();
+        holdStart('undo');
+        e.preventDefault();
+    }, { passive: false });
+    clearBtn.addEventListener('touchstart', function(e) {
+        e.stopPropagation();
+        holdStart('clear');
+        e.preventDefault();
+    }, { passive: false });
+
+    // touchend/cancel på hela fönstret stänger hållningen (fingret lyfts)
+    window.addEventListener('touchend', holdEnd, { passive: true });
+    window.addEventListener('touchcancel', holdEnd, { passive: true });
+
+    // Mus: mousedown startar hållningen, mouseup/mouseleave avslutar
+    undoBtn.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
+        holdStart('undo');
     });
+    clearBtn.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
+        holdStart('clear');
+    });
+    window.addEventListener('mouseup', holdEnd);
+    undoBtn.addEventListener('mouseleave', holdEnd);
+    clearBtn.addEventListener('mouseleave', holdEnd);
 
     // --- Back-knapp: håll användaren kvar i appen ---
     // Bakåt får aldrig lämna sidan — i pinnat läge strandar den installerade
@@ -471,9 +531,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { capture: true, passive: true });
 
-    // Lås orientering till porträtt (kräver fullscreen/standalone)
+    // Lås orientering till landskap (kräver fullscreen/standalone)
     if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('portrait').catch(() => {});
+        screen.orientation.lock('landscape').catch(() => {});
     }
 
     document.addEventListener('fullscreenchange', () => {

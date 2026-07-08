@@ -8,10 +8,12 @@ och användas av barn. Språk i appen och i koden (kommentarer, knappnamn) är
 
 - Fullskärmsritapp med 6 färger (svart, röd, gul, blå, grön, lila), fast
   penselbredd (16 px på "papperet") och rundad pensel.
-- **ÅNGRA** — ångra upp till 10 streck (`MAX_UNDO`).
-- **RENSA** — tvåstegs bekräftelse: första tryck visar "SÄKER?" (röd, 5 s
-  timeout / nollställs vid nytt ritstreck), andra tryck tömmer duken.
-- Låser orientering till **porträtt**, går i fullscreen och "naglar fast"
+- **ÅNGRA** — ångra upp till 10 streck (`MAX_UNDO`). Håll in knappen i 2 s
+  (`HOLD_MS`) för att aktivera; ett kort tryck gör inget.
+- **RENSA** — tvåstegs bekräftelse med hållning: första hållningen (2 s)
+  visar "SÄKER?" (röd, 5 s timeout / nollställs vid nytt ritstreck), andra
+  hållningen (2 s) tömmer duken.
+- Låser orientering till **landskap**, går i fullscreen och "naglar fast"
   layouten så systemfälten (statusfält) inte kan trycka undan ritytan.
 - Fungerar **offline** som installerad PWA (service worker cachar allt).
 - Multi-touch: appen låter bara det *senast nedtryckta* fingret rita, så ett
@@ -54,7 +56,7 @@ gäller: commit-meddelanden på svenska, signera med
 | `app.js` | All app-logik (ritande, undo, clear, layout, fullscreen, SW-registrering). |
 | `style.css` | Layout via flex/grid, safe-area, knapp-panelens rutnät i både porträtt och landskap. |
 | `sw.js` | Service worker — nät-först med cache-reserv. Bumpa `VERSION` vid varje deploy. |
-| `manifest.json` | PWA-manifest (`standalone`, `portrait`, ikoner). |
+| `manifest.json` | PWA-manifest (`standalone`, `landscape`, ikoner). |
 | `icon-192.png`, `icon-512.png` | App-ikoner. |
 
 ## Arkitektur / viktiga detaljer i `app.js`
@@ -83,6 +85,21 @@ gäller: commit-meddelanden på svenska, signera med
   knapparna lyfts upp direkt.
 - **Undo** lagras som `ImageData` via `getImageData`/`putImageData` (max 10).
   `pushUndo()` anropas i början av varje streck och inför RENSA.
+- **Håll-in-knappar (`HOLD_MS`):** ÅNGRA och RENSA kräver att fingret hålls
+  intryckt i 2 s (`HOLD_MS`) för att aktiveras — ett kort tryck gör inget,
+  så ett barn inte råkar ångra/rensa vid missögon. Hållningen styrs av
+  `startHold`/`endHold` med en `setTimeout`; CSS-klassen `.holding` visar
+  en progress-animasjon (`hold-fill`) som fylls uppåt över 2 s så barnet
+  ser att man ska hålla kvar. RENSA behåller sin tvåstegsbekräftelse:
+  första hållningen visar SÄKER?, andra hållningen tömmer duken.
+- **Dö-yta runt knappanelen:** `#button-container` har
+  `env(safe-area-inset-*)` som padding på alla fyra sidor och svart
+  bakgrund. Systemfälten (som kan dyka upp på vilken sida som helst när
+  barnet råkar dra fram dem — telefon: sidorna, tablet: botten) hamnar
+  framför svart dö-yta istället för framför knapparna. I immersive
+  fullscreen är inset 0 → ingen dö-yta. `#app`:s layoutlås-padding
+  (`padding-bottom` vid pinning) finns kvar som backup för
+  skärmlåsningsläget där hela fönstret förskjuts.
 - **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") visas vid
   appstart, i webbläsarläge när fullscreen saknas, och som reserv när
   bakåt-fällans `popstate` triggas. Knappen begär **alltid**
