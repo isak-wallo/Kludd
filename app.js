@@ -353,8 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function selectColor(color, element) {
         currentColor = color;
         pCtx.strokeStyle = currentColor;
-        const boxes = document.querySelectorAll('.color-box');
-        boxes.forEach(box => box.classList.remove('selected'));
+        colorBoxes.forEach(box => box.classList.remove('selected'));
         element.classList.add('selected');
         resetClearButton();
     }
@@ -431,11 +430,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // och när fullscreen tappats, och BÖRJA KLUDDA-knappen (en äkta gest) tar
     // tillbaka in i fullscreen. Ritningen på papperet påverkas inte.
     function showStartOverlay() {
-        document.getElementById('start-overlay').style.display = 'flex';
+        startOverlay.style.display = 'flex';
         resetClearButton();
     }
 
     // --- Händelsebindningar (tidigare inline i HTML) ---
+    const startOverlay = document.getElementById('start-overlay');
     document.getElementById('start-btn').addEventListener('click', startApp);
 
     const colorBoxes = document.querySelectorAll('.color-box');
@@ -558,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('fullscreenchange', () => {
         if (document.fullscreenElement) {
-            document.getElementById('start-overlay').style.display = 'none';
+            startOverlay.style.display = 'none';
         } else if (!isInstalledApp()) {
             // Webbläsarläge: startskärmen är enda vägen tillbaka till
             // fullscreen. Installerad app visar INGEN startskärm här utan
