@@ -16,10 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastY = 0;
     let currentColor = '#000000';
     const lineWidth = 16;
+
+    pCtx.lineCap = 'round';
+    pCtx.lineJoin = 'round';
+    pCtx.lineWidth = lineWidth;
+    pCtx.strokeStyle = currentColor;
+
     let clearState = 0;
     let clearTimer = null;
     const MAX_UNDO = 10;   // Hur många steg bakåt man kan ångra
     let undoStack = [];
+    let viewRect = { left: 0, top: 0 };
 
     // --- Håll-in-logik för systemknappar (ÅNGRA / RENSA) ---
     // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 1 s) för att
@@ -37,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
         holdFired = false;
         holdTimer = setTimeout(() => {
             holdFired = true;
+            const btn = document.getElementById(target + '-btn');
+            if (btn) btn.classList.remove('holding');
             if (target === 'undo') undo();
             else handleClear();
         }, HOLD_MS);
@@ -51,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!canvasContainer) return;
         viewCanvas.width = canvasContainer.clientWidth;
         viewCanvas.height = canvasContainer.clientHeight;
+        viewRect = viewCanvas.getBoundingClientRect();
         render();
     }
 
@@ -142,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const W = viewCanvas.width;
         const H = viewCanvas.height;
         if (W === 0 || H === 0) return;
-        vCtx.clearRect(0, 0, W, H);
         vCtx.imageSmoothingEnabled = false;
 
         if (W < H) {
@@ -161,10 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const len = pendingPoints.length;
         if (len === 0) return;
         pCtx.beginPath();
-        pCtx.strokeStyle = currentColor;
-        pCtx.lineWidth = lineWidth;
-        pCtx.lineCap = 'round';
-        pCtx.lineJoin = 'round';
         pCtx.moveTo(lastX, lastY);
         for (let i = 0; i < len; i += 2) {
             pCtx.lineTo(pendingPoints[i], pendingPoints[i + 1]);
@@ -187,9 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getPaperCoordsXY(clientX, clientY) {
-        const rect = viewCanvas.getBoundingClientRect();
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
+        const x = clientX - viewRect.left;
+        const y = clientY - viewRect.top;
 
         const W = viewCanvas.width;
         const H = viewCanvas.height;
@@ -354,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function selectColor(color, element) {
         currentColor = color;
+        pCtx.strokeStyle = currentColor;
         const boxes = document.querySelectorAll('.color-box');
         boxes.forEach(box => box.classList.remove('selected'));
         element.classList.add('selected');
@@ -450,10 +455,11 @@ document.addEventListener('DOMContentLoaded', () => {
             selectColor(color, this);
         });
         box.addEventListener('touchstart', function(e) {
+            e.preventDefault();  // Förhindra ghost clicks (simulerade mus-event)
             e.stopPropagation(); // Hindra canvas touch-hantering
             const color = this.getAttribute('data-color');
             selectColor(color, this);
-        }, { passive: true });
+        }, { passive: false });
     });
 
     // Systemknappar (undo, clear) — håll in HOLD_MS (ca 2 s) för att aktivera.

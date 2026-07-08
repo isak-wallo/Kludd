@@ -1,6 +1,6 @@
 // Höj VERSION (v3 -> v4 osv.) varje gång du laddar upp nya filer,
 // så hämtas och cachas den nya versionen säkert.
-const VERSION = 'v23';
+const VERSION = 'v24';
 const CACHE = 'rita-' + VERSION;
 
 const ASSETS = [
@@ -41,26 +41,38 @@ self.addEventListener('message', function (e) {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// Hämta: nätet först (så uppdateringar syns), cachen som reserv offline.
-// Endast egna GET-anrop hanteras, och bara lyckade svar cachas.
+// Hämta: cachen först (för blixtsnabb start), hämta sedan tyst i bakgrunden.
+// Endast egna GET-anrop hanteras.
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
   if (new URL(req.url).origin !== self.location.origin) return;
 
   e.respondWith(
-    fetch(req)
-      .then(function (res) {
-        if (res && res.ok) {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
-        }
-        return res;
-      })
-      .catch(function () {
-        return caches.match(req).then(function (r) {
-          return r || caches.match('./index.html');
+    caches.match(req).then(function (cachedResponse) {
+      if (cachedResponse) {
+        e.waitUntil(
+          fetch(req).then(function (res) {
+            if (res && res.ok) {
+              var copy = res.clone();
+              caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
+            }
+          }).catch(function () {})
+        );
+        return cachedResponse;
+      }
+
+      return fetch(req)
+        .then(function (res) {
+          if (res && res.ok) {
+            var copy = res.clone();
+            caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
+          }
+          return res;
+        })
+        .catch(function () {
+          return caches.match('./index.html');
         });
-      })
+    })
   );
 });
