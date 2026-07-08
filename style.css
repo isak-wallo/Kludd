@@ -192,7 +192,7 @@ body {
 }
 
 /* Håll-in-feedback: en rad växer uppifrån/nedifrån och fylls på medan
-   fingret hålls. När den fyllt knappen (efter HOLD_MS = 1,5 s) aktiveras
+   fingret hålls. När den fyllt knappen (efter HOLD_MS = 1 s) aktiveras
    funktionen. Visar barnet att man ska hålla kvar. */
 .sys-btn.holding::after {
     content: '';
@@ -202,7 +202,7 @@ body {
     width: 100%;
     height: 0;
     background-color: rgba(255, 255, 255, 0.35);
-    animation: hold-fill 1.5s linear forwards;
+    animation: hold-fill 1s linear forwards;
     pointer-events: none;
 }
 @keyframes hold-fill {

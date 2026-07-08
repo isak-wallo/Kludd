@@ -22,11 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let undoStack = [];
 
     // --- Håll-in-logik för systemknappar (ÅNGRA / RENSA) ---
-    // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 1,5 s) för att
+    // Båda kräver att man håller fingret intryckt i HOLD_MS (ca 1 s) för att
     // aktiveras. RENSA har kvar sin tvåstegsbekräftelse: första hållningen
     // visar SÄKER?, andra hållningen tömmer duken. En kort tryckning gör inget
     // — det förhindrar att ett barn råkar rensa/ångra vid missögon.
-    const HOLD_MS = 1500;
+    const HOLD_MS = 1000;
     let holdTimer = null;
     let holdTarget = null;     // vilken knapp som hålls ('undo' | 'clear')
     let holdFired = false;      // har aktiveringen redan skett för denna hållning?
@@ -67,12 +67,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // fönstret nedåt så knapparna annars klipps vid skärmens nederkant.
     const SHRINK_ADOPT_MS = 400;
 
-    // Statisk dö-yta i botten: en permanent svart remsa som alltid finns
-    // där. Garanterar att Androids systemknappar (bakåt/hem/översikt) hamnar
-    // framför svart dö-yta istället för framför knapparna eller nedersta
-    // delen av ritytan. safe-area-inset fungerar inte i installerad standalone-
-    // app (inset = 0), därför en fast remsa. 48 px ≈ en systemknappshöjd.
-    const DEAD_ZONE_BOTTOM = 48;
+    // Statisk dö-yta: en permanent svart remsa som alltid finns där.
+    // Garanterar att Androids systemknappar (bakåt/hem/översikt) hamnar
+    // framför svart dö-yta istället för framför knapparna eller ritytan.
+    // safe-area-inset fungerar inte i installerad standalone-app (inset = 0),
+    // därför en fast remsa. 48 px ≈ en systemknappshöjd.
+    // Sidan beror på enhet: telefon i landskap har systemknapparna på en
+    // långsida (höger), tablet i botten. Vi skiljer på skärmhöjd: låst
+    // höjd < 550 px räknas som telefon (dö-yta till höger), annars tablet
+    // (dö-yta i botten).
+    const DEAD_ZONE = 48;
+    const PHONE_LANDSCAPE_MAX_H = 550;
 
     function applyLayout() {
         const isLandscape = window.innerWidth > window.innerHeight;
@@ -108,17 +113,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (app) {
             app.style.width = lockedW + 'px';
             app.style.height = lockedH + 'px';
-            // Dö-yta i botten: alltid DEAD_ZONE_BOTTOM (statisk svart remsa)
-            // + extra om visualViewport indikerar att systemfälten syns (t.ex.
-            // vid skärmlåsning/pinning där hela fönstret förskjuts). I immersive
-            // fullscreen är den dynamiska delen 0 — bara den statiska remsan
-            // finns, vilket är ett medvetet val för att alltid skydda knapparna.
-            let bottomBar = DEAD_ZONE_BOTTOM;
+            // Dö-yta: telefon (låst höjd < 550 px) -> svart remsa till höger,
+            // tablet -> svart remsa i botten. + extra dynamisk padding om
+            // visualViewport indikerar synliga systemfält (t.ex. vid
+            // skärmlåsning/pinning där hela fönstret förskjuts). I immersive
+            // fullscreen är den dynamiska delen 0.
+            const isPhone = lockedH < PHONE_LANDSCAPE_MAX_H;
+            let staticPad = DEAD_ZONE;
+            let dynPad = 0;
             if (window.visualViewport) {
-                const dyn = lockedH - window.visualViewport.height - window.visualViewport.offsetTop;
-                if (dyn > 0) bottomBar += dyn;
+                const dyn = isPhone
+                    ? lockedW - window.visualViewport.width - window.visualViewport.offsetLeft
+                    : lockedH - window.visualViewport.height - window.visualViewport.offsetTop;
+                if (dyn > 0) dynPad = dyn;
             }
-            app.style.paddingBottom = bottomBar + 'px';
+            if (isPhone) {
+                app.style.paddingRight = (staticPad + dynPad) + 'px';
+                app.style.paddingBottom = '';
+            } else {
+                app.style.paddingBottom = (staticPad + dynPad) + 'px';
+                app.style.paddingRight = '';
+            }
         }
         resizeCanvas();
     }
