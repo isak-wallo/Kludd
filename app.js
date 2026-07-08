@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let clearState = 0;
     let clearTimer = null;
     const MAX_UNDO = 10;   // Hur många steg bakåt man kan ångra
-    let undoStack = [];
+    const undoStack = [];
     let viewRect = { left: 0, top: 0 };
 
     // --- Håll-in-logik för systemknappar (ÅNGRA / RENSA) ---
@@ -35,17 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // — det förhindrar att ett barn råkar rensa/ångra vid missögon.
     const HOLD_MS = 1000;
     let holdTimer = null;
-    let holdTarget = null;     // vilken knapp som hålls ('undo' | 'clear')
-    let holdFired = false;      // har aktiveringen redan skett för denna hållning?
 
     function startHold(target) {
         if (holdTimer) clearTimeout(holdTimer);
-        holdTarget = target;
-        holdFired = false;
         holdTimer = setTimeout(() => {
-            holdFired = true;
-            const btn = document.getElementById(target + '-btn');
-            if (btn) btn.classList.remove('holding');
+            const btn = target === 'undo' ? undoBtn : clearBtn;
+            btn.classList.remove('holding');
             if (target === 'undo') undo();
             else handleClear();
         }, HOLD_MS);
@@ -53,13 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function endHold() {
         if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-        holdTarget = null;
     }
 
     function resizeCanvas() {
         if (!canvasContainer) return;
         viewCanvas.width = canvasContainer.clientWidth;
         viewCanvas.height = canvasContainer.clientHeight;
+        vCtx.imageSmoothingEnabled = false;
         viewRect = viewCanvas.getBoundingClientRect();
         render();
     }
@@ -152,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const W = viewCanvas.width;
         const H = viewCanvas.height;
         if (W === 0 || H === 0) return;
-        vCtx.imageSmoothingEnabled = false;
 
         if (W < H) {
             vCtx.drawImage(paper, 0, 0, W, H);
@@ -164,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let renderPending = false;
-    let pendingPoints = [];
+    const pendingPoints = [];
 
     function flushPendingStrokes() {
         const len = pendingPoints.length;
@@ -369,11 +363,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // (röd, 5 s timeout / nollställs vid nytt ritstreck), andra hållningen
     // (2 s) tömmer duken.
     function handleClear() {
-        const btn = document.getElementById('clear-btn');
         if (clearState === 0) {
             clearState = 1;
-            btn.textContent = 'SÄKER?';
-            btn.classList.add('confirm');
+            clearBtn.textContent = 'SÄKER?';
+            clearBtn.classList.add('confirm');
             clearTimer = setTimeout(resetClearButton, 5000);
         } else {
             pushUndo();
@@ -390,10 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(clearTimer);
             clearTimer = null;
         }
-        const btn = document.getElementById('clear-btn');
-        if (btn) {
-            btn.textContent = 'RENSA';
-            btn.classList.remove('confirm');
+        if (clearBtn) {
+            clearBtn.textContent = 'RENSA';
+            clearBtn.classList.remove('confirm');
         }
     }
 
@@ -415,8 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUndoState() {
-        const btn = document.getElementById('undo-btn');
-        if (btn) btn.disabled = (undoStack.length === 0);
+        if (undoBtn) undoBtn.disabled = (undoStack.length === 0);
     }
 
     function isInstalledApp() {

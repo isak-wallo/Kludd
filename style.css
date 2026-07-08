@@ -2,13 +2,11 @@
     box-sizing: border-box;
 }
 
-html, body {
-    overscroll-behavior: none;
-}
 body {
     margin: 0;
     padding: 0;
     overflow: hidden;
+    overscroll-behavior: none;
     user-select: none;
     -webkit-user-select: none;
     background-color: #000;
@@ -87,7 +85,6 @@ body {
     display: block;
     width: 100%;
     height: 100%;
-    touch-action: none; /* Hindrar att svep/zoom stör ritandet */
 }
 
 /* Panel med 4x2-rutnät: 6 färger + RENSA som upptar 2 celler.

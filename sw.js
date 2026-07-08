@@ -1,6 +1,6 @@
 // Höj VERSION (v3 -> v4 osv.) varje gång du laddar upp nya filer,
 // så hämtas och cachas den nya versionen säkert.
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE = 'rita-' + VERSION;
 
 const ASSETS = [
