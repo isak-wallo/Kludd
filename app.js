@@ -81,8 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // långsida (höger), tablet i botten. Vi skiljer på skärmhöjd: låst
     // höjd < 550 px räknas som telefon (dö-yta till höger), annars tablet
     // (dö-yta i botten).
+    // Den statiska remsan sätts bara på Android — på iPad/dator finns inga
+    // systemknappar över appen, så där skulle den bara ta plats.
     const DEAD_ZONE = 48;
     const PHONE_LANDSCAPE_MAX_H = 550;
+    const IS_ANDROID = /Android/i.test(navigator.userAgent);
 
     function applyLayout() {
         const isLandscape = window.innerWidth > window.innerHeight;
@@ -124,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // skärmlåsning/pinning där hela fönstret förskjuts). I immersive
             // fullscreen är den dynamiska delen 0.
             const isPhone = lockedH < PHONE_LANDSCAPE_MAX_H;
-            let staticPad = DEAD_ZONE;
+            let staticPad = IS_ANDROID ? DEAD_ZONE : 0;
             let dynPad = 0;
             if (window.visualViewport) {
                 const dyn = isPhone
@@ -358,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
         resetClearButton();
     }
 
-    // RENSA — tvåstegs med hållning: första hållningen (2 s) visar "SÄKER?"
+    // RENSA — tvåstegs med hållning: första hållningen (1 s) visar "SÄKER?"
     // (röd, 5 s timeout / nollställs vid nytt ritstreck), andra hållningen
-    // (2 s) tömmer duken.
+    // (1 s) tömmer duken.
     function handleClear() {
         if (clearState === 0) {
             clearState = 1;
@@ -419,9 +422,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Android kan tvinga fram systemfälten (t.ex. vid skärmlåsning) utan
         // att HTML-fullscreen formellt släpps; en ny begäran med gest rättar
         // till läget, och är den redan i fullscreen händer inget.
-        document.documentElement.requestFullscreen().catch(err => {
-            console.log(`Helskärm misslyckades: ${err.message}`);
-        });
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Helskärm misslyckades: ${err.message}`);
+            });
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            // Äldre iPads (före iPadOS 16.4) har bara webkit-prefixet.
+            document.documentElement.webkitRequestFullscreen();
+        }
         document.getElementById('start-overlay').style.display = 'none';
         setTimeout(applyLayout, 100);
     }
@@ -453,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: false });
     });
 
-    // Systemknappar (undo, clear) — håll in HOLD_MS (ca 2 s) för att aktivera.
+    // Systemknappar (undo, clear) — håll in HOLD_MS (1 s) för att aktivera.
     // RENSA har tvåstegs: första hållningen visar SÄKER?, andra hållningen
     // tömmer duken. Touchstart på knapparna stopPropagates så de inte startar
     // ett streck; click finns kvar för mus/test på dator (håll via mousedown).
@@ -551,14 +559,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { capture: true, passive: true });
 
-    // Lås orientering till landskap (kräver fullscreen/standalone)
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
+    // Lås orientering till landskap. Låset biter bara i helskärm eller
+    // installerad app — i vanligt webbläsarläge utan helskärm nekas det
+    // tyst, därför görs ett nytt försök varje gång helskärm tas (se
+    // fullscreenchange nedan).
+    function lockOrientation() {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
     }
+    lockOrientation();
 
     document.addEventListener('fullscreenchange', () => {
         if (document.fullscreenElement) {
             startOverlay.style.display = 'none';
+            lockOrientation();  // nu kan låset bita (kräver helskärm)
         } else if (!isInstalledApp()) {
             // Webbläsarläge: startskärmen är enda vägen tillbaka till
             // fullscreen. Installerad app visar INGEN startskärm här utan

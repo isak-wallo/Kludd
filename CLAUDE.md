@@ -15,6 +15,9 @@ och användas av barn. Språk i appen och i koden (kommentarer, knappnamn) är
   hållningen (1 s) tömmer duken.
 - Låser orientering till **landskap**, går i fullscreen och "naglar fast"
   layouten så systemfälten (statusfält) inte kan trycka undan ritytan.
+  Orienteringslåset biter bara i fullscreen/installerad app — i vanligt
+  webbläsarläge (t.ex. Safari på iPad) kan appen snurra med enheten; nytt
+  låsförsök görs varje gång fullscreen tas (`lockOrientation()`).
 - Fungerar **offline** som installerad PWA (service worker cachar allt).
 - Multi-touch: appen låter bara det *senast nedtryckta* fingret rita, så ett
   barn kan vila en hand på skärmen medan det ritar med andra handen. Färg-
@@ -100,7 +103,9 @@ gäller: commit-meddelanden på svenska, signera med
   tablet → remsa i botten (`padding-bottom`). Garanterar att Androids
   systemknappar hamnar framför svart dö-yta istället för framför
   knapparna eller ritytan. safe-area-inset fungerar inte i standalone-läge
-  (inset = 0), därför en fast remsa. Utöver den statiska remsan läggs
+  (inset = 0), därför en fast remsa. Den statiska remsan sätts bara på
+  Android (`IS_ANDROID` via user agent) — på iPad/dator är den 0, eftersom
+  inga systemknappar ligger över appen där. Utöver den statiska remsan läggs
   extra dynamisk padding till om `visualViewport` indikerar synliga
   systemfält (t.ex. vid skärmlåsning/pinning där hela fönstret förskjuts).
 - **Start-overlay / fullscreen:** startskärmen ("BÖRJA KLUDDA") visas vid
@@ -108,8 +113,9 @@ gäller: commit-meddelanden på svenska, signera med
   bakåt-fällans `popstate` triggas. Knappen begär **alltid**
   `requestFullscreen()` — även om `fullscreenElement` ser satt ut, eftersom
   Android kan tvinga fram systemfälten (t.ex. vid pinning) utan att
-  HTML-fullscreen formellt släpps. Ritningen på papperet påverkas inte av
-  att overlayen visas.
+  HTML-fullscreen formellt släpps. Saknas standard-API:et (iPad före
+  iPadOS 16.4) faller knappen tillbaka på `webkitRequestFullscreen()`.
+  Ritningen på papperet påverkas inte av att overlayen visas.
 - **Back-button:** bakåt får aldrig lämna sidan (pinnad installerad app
   strandar annars på WebAPK:ns splash-skärm). Huvudskyddet är en
   **gest-armerad pushState-buffert**: vid `pointerdown` fylls historiken
