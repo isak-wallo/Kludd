@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const colorBoxes = document.querySelectorAll('.color-box');
     const undoBtn = document.getElementById('undo-btn');
     const clearBtn = document.getElementById('clear-btn');
+    const app = document.getElementById('app');
 
     pCtx.fillStyle = '#ffffff';
     pCtx.fillRect(0, 0, paper.width, paper.height);
@@ -51,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
         holdTimer = setTimeout(() => {
             const btn = target === 'undo' ? undoBtn : clearBtn;
             btn.classList.remove('holding');
+            // Avsluta ett pågående streck först — annars blandas ångra/rensa
+            // med streckets buffrade punkter (multitouch: andra handen ritar).
+            if (isDrawing) { endStroke(); activeTouchId = null; }
             if (target === 'undo') undo();
             else handleClear();
         }, HOLD_MS);
@@ -62,9 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resizeCanvas() {
         if (!canvasContainer) return;
-        viewCanvas.width = canvasContainer.clientWidth;
-        viewCanvas.height = canvasContainer.clientHeight;
-        vCtx.imageSmoothingEnabled = false;
+        const w = canvasContainer.clientWidth;
+        const h = canvasContainer.clientHeight;
+        // Att sätta width/height nollställer HELA canvas-bufferten även om
+        // storleken är oförändrad — gör det bara vid faktisk ändring, så
+        // slipper varje applyLayout kosta en omallokering.
+        if (viewCanvas.width !== w || viewCanvas.height !== h) {
+            viewCanvas.width = w;
+            viewCanvas.height = h;
+            vCtx.imageSmoothingEnabled = false;
+        }
         viewRect = viewCanvas.getBoundingClientRect();
         render();
     }
@@ -127,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }, SHRINK_ADOPT_MS);
         }
 
-        const app = document.getElementById('app');
         if (app) {
             app.style.width = lockedW + 'px';
             app.style.height = lockedH + 'px';
@@ -496,6 +506,20 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     }, { passive: false });
 
+    // Touch-hållning avbryts om fingret glider utanför knappen (samma som
+    // mouseleave för mus). Touch-event riktas alltid till elementet där
+    // touchen startade, så touchmove på knappen räcker för en bounds-check.
+    function holdTouchMove(e) {
+        const t = e.changedTouches[0];
+        const r = this.getBoundingClientRect();
+        if (t.clientX < r.left || t.clientX > r.right ||
+            t.clientY < r.top || t.clientY > r.bottom) {
+            holdEnd();
+        }
+    }
+    undoBtn.addEventListener('touchmove', holdTouchMove, { passive: true });
+    clearBtn.addEventListener('touchmove', holdTouchMove, { passive: true });
+
     // touchend/cancel på hela fönstret stänger hållningen (fingret lyfts)
     window.addEventListener('touchend', holdEnd, { passive: true });
     window.addEventListener('touchcancel', holdEnd, { passive: true });
@@ -613,6 +637,11 @@ document.addEventListener('DOMContentLoaded', () => {
     viewCanvas.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onTouchEnd, { passive: true });
     window.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    // Blockera pinch-zoom på iOS — Safari har ignorerat user-scalable=no
+    // ända sedan iOS 10. gesturestart är iOS-specifik och finns inte på
+    // Android (där meta-taggen redan räcker), så detta är en no-op där.
+    document.addEventListener('gesturestart', e => e.preventDefault());
 
     // Debounca layout-events så snabba resize/rotation-serier
     // bara triggar en enda omräkning per frame.

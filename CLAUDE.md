@@ -22,7 +22,9 @@ och användas av barn. Språk i appen och i koden (kommentarer, knappnamn) är
 - Multi-touch: appen låter bara det *senast nedtryckta* fingret rita, så ett
   barn kan vila en hand på skärmen medan det ritar med andra handen. Färg-
   och systemknappar har `stopPropagation` på `touchstart` så de ej startar
-  ett streck.
+  ett streck. Pinch-zoom blockeras globalt (`gesturestart` +
+  `touch-action: none` på `#app`) eftersom Safari på iOS ignorerar
+  `user-scalable=no`.
 
 ## Hosting / driftsättning
 
@@ -93,8 +95,12 @@ gäller: commit-meddelanden på svenska, signera med
   så ett barn inte råkar ångra/rensa vid missögon. Hållningen styrs av
   `startHold`/`endHold` med en `setTimeout`; CSS-klassen `.holding` visar
   en progress-animasjon (`hold-fill`) som fylls uppåt över 1 s så barnet
-  ser att man ska hålla kvar. RENSA behåller sin tvåstegsbekräftelse:
-  första hållningen visar SÄKER?, andra hållningen tömmer duken.
+  ser att man ska hålla kvar. Animationens längd synkas med `HOLD_MS` via
+  CSS-variabeln `--hold-ms`. Hållningen avbryts om fingret glider utanför
+  knappen (touchmove-bounds-check, motsvarar `mouseleave` för mus), och ett
+  pågående ritstreck avslutas snyggt innan ångra/rensa körs (multitouch).
+  RENSA behåller sin tvåstegsbekräftelse: första hållningen visar SÄKER?,
+  andra hållningen tömmer duken.
 - **Dö-yta:** `applyLayout` sätter en permanent svart remsa (`DEAD_ZONE`,
   48 px ≈ en systemknappshöjd) som `padding` på `#app` (som har
   `background-color: #000`). Sidan beror på enhet, skild på skärmhöjd:

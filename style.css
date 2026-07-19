@@ -24,6 +24,7 @@ body {
     display: flex;
     flex-direction: column;
     background-color: #000;  /* dö-yta (padding-bottom) blir svart */
+    touch-action: none;      /* pinch-zoom-skydd även i knapp-panelens mellanrum */
 }
 @media (orientation: landscape) {
     #app {
