@@ -1,6 +1,6 @@
 // Höj VERSION (v3 -> v4 osv.) varje gång du laddar upp nya filer,
 // så hämtas och cachas den nya versionen säkert.
-const VERSION = 'v27';
+const VERSION = 'v28';
 const CACHE = 'rita-' + VERSION;
 
 const ASSETS = [
@@ -34,11 +34,6 @@ self.addEventListener('activate', function (e) {
       })
       .then(function () { return self.clients.claim(); })
   );
-});
-
-// Låter sidan be en väntande service worker att ta över direkt.
-self.addEventListener('message', function (e) {
-  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Hämta: cachen först (för blixtsnabb start), hämta sedan tyst i bakgrunden.

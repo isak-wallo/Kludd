@@ -58,7 +58,7 @@ gäller: commit-meddelanden på svenska, signera med
 | `index.html` | Markup: start-overlay, canvas-container, knapp-panel (6 färger + ÅNGRA + RENSA). Alla event-bindningar görs i `app.js`, inte inline. |
 | `app.js` | All app-logik (ritande, undo, clear, layout, fullscreen, SW-registrering). |
 | `style.css` | Layout via flex/grid, safe-area, knapp-panelens rutnät i både porträtt och landskap. |
-| `sw.js` | Service worker — nät-först med cache-reserv. Bumpa `VERSION` vid varje deploy. |
+| `sw.js` | Service worker — cache-first med tyst bakgrundsuppdatering (stale-while-revalidate). Bumpa `VERSION` vid varje deploy. |
 | `manifest.json` | PWA-manifest (`standalone`, `landscape`, ikoner). |
 | `icon-192.png`, `icon-512.png` | App-ikoner. |
 

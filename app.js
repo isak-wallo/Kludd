@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const pCtx = paper.getContext('2d', { willReadFrequently: true });
     const canvasContainer = document.getElementById('canvas-container');
 
+    // Element-referenser — deklarerade först så att funktionerna nedan
+    // aldrig kan råka använda dem före deklarationen.
+    const startOverlay = document.getElementById('start-overlay');
+    const colorBoxes = document.querySelectorAll('.color-box');
+    const undoBtn = document.getElementById('undo-btn');
+    const clearBtn = document.getElementById('clear-btn');
+
     pCtx.fillStyle = '#ffffff';
     pCtx.fillRect(0, 0, paper.width, paper.height);
 
@@ -34,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // visar SÄKER?, andra hållningen tömmer duken. En kort tryckning gör inget
     // — det förhindrar att ett barn råkar rensa/ångra vid missögon.
     const HOLD_MS = 1000;
+    // Synka håll-animationens längd i CSS med HOLD_MS (--hold-ms används
+    // av .sys-btn.holding i style.css).
+    document.documentElement.style.setProperty('--hold-ms', HOLD_MS + 'ms');
     let holdTimer = null;
 
     function startHold(target) {
@@ -443,10 +453,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Händelsebindningar (tidigare inline i HTML) ---
-    const startOverlay = document.getElementById('start-overlay');
     document.getElementById('start-btn').addEventListener('click', startApp);
 
-    const colorBoxes = document.querySelectorAll('.color-box');
     colorBoxes.forEach(box => {
         // Click för mus, touchstart för multi-touch under ritning
         box.addEventListener('click', function() {
@@ -465,9 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // RENSA har tvåstegs: första hållningen visar SÄKER?, andra hållningen
     // tömmer duken. Touchstart på knapparna stopPropagates så de inte startar
     // ett streck; click finns kvar för mus/test på dator (håll via mousedown).
-    const undoBtn = document.getElementById('undo-btn');
-    const clearBtn = document.getElementById('clear-btn');
-
     function holdStart(target) {
         const btn = (target === 'undo') ? undoBtn : clearBtn;
         if (btn.disabled) return;
@@ -495,12 +500,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchend', holdEnd, { passive: true });
     window.addEventListener('touchcancel', holdEnd, { passive: true });
 
-    // Mus: mousedown startar hållningen, mouseup/mouseleave avslutar
+    // Mus: mousedown startar hållningen (bara vänster knapp — höger- och
+    // mittklick ignoreras), mouseup/mouseleave avslutar
     undoBtn.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
         e.stopPropagation();
         holdStart('undo');
     });
     clearBtn.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
         e.stopPropagation();
         holdStart('clear');
     });

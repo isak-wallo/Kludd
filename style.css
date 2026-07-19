@@ -189,8 +189,10 @@ body {
 }
 
 /* Håll-in-feedback: en rad växer uppifrån/nedifrån och fylls på medan
-   fingret hålls. När den fyllt knappen (efter HOLD_MS = 1 s) aktiveras
-   funktionen. Visar barnet att man ska hålla kvar. */
+   fingret hålls. När den fyllt knappen aktiveras funktionen. Längden
+   styrs av CSS-variabeln --hold-ms som sätts från HOLD_MS i app.js
+   (1 s som reserv om JS inte hunnit sätta den). Visar barnet att man
+   ska hålla kvar. */
 .sys-btn.holding::after {
     content: '';
     position: absolute;
@@ -199,7 +201,7 @@ body {
     width: 100%;
     height: 0;
     background-color: rgba(255, 255, 255, 0.35);
-    animation: hold-fill 1s linear forwards;
+    animation: hold-fill var(--hold-ms, 1s) linear forwards;
     pointer-events: none;
 }
 @keyframes hold-fill {
